@@ -3,8 +3,8 @@ Screen('Preference', 'SkipSyncTests', 1);
 cd('C:\Users\labadmin\Documents\Qingjie-GitHub\Speed-performance');
 
 subj = 'pilot';  
-dateTime = clock;                %get  s time for seed             
-rng(sum(100*dateTime) );
+dateTime = clock;                % get time for seed             
+rng(sum(100*dateTime) );      % 也就是给每组实验/数据dataset 编一个编码，确保这组实验的可track
 expName = 'practice_traj';
 session = 01;
 redoCalib = 0;
@@ -12,52 +12,62 @@ redoCalib = 0;
 [displayInfo] = startExp(subj,datetime,rng);
 [displayInfo] = screenVisuals(displayInfo);
 if exist(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) '_' date,'_tform.mat']) && redoCalib == 0
-    load(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) '_' date,'_tform.mat']) %load calibration incase of restart
+    load(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) '_' date,'_tform.mat']) %load calibration in case of restart
     load(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) '_' date,'_calibration.mat'])
     
 else
     [tform, calibration,startPhase] = penCalib(displayInfo);
-    save(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) '_' date,'_tform.mat'],'tform')
+    save(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) '_' date,'_tform.mat'],'tform') % tform.mat —— 存储几何变换信息（坐标变换）
     save(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) '_' date,'_calibration.mat'],'calibration')
 end
 mode = 0; % lift = 1, slide = 0
 %%
 start_size = 20;
 cursor_size = 5;
-pixellength = 0.248;
+pixellength = 0.248; % 每个像素对应的物理长度（单位 mm）
 wait = 0.5;
 patience = 0.5;
-topBuff = [0 0 displayInfo.screenXpixels displayInfo.screenAdj/2]; %black bar at top of screen
+% story(1) = wait：等待阶段（目标显示但不能移动）
+% story(2) = wait + lifespan(current_block)：目标开始消失
+% story(3) = wait + lifespan(current_block) + patience：实验的最后时限
+
+% 例如，第二个block中：
+% 
+% 等待阶段：wait = 0.5秒（目标出现，无法移动，仅观察）
+% 目标逐渐消失阶段：lifespan = 0.6秒（目标尺寸从满值逐渐减小到零，得分逐渐从满分降低到零）
+% 最大忍耐等待时长：patience = 0.5秒（再过0.5秒若仍未完成动作，试验将强制结束）
+% 总时间长度 = wait + lifespan + patience = 0.5 + 0.6 + 0.5 = 1.6秒
+
+topBuff = [0 0 displayInfo.screenXpixels displayInfo.screenAdj/2]; %black bar at top of screen 设置顶部和底部的黑色缓冲区域，用于实验界面布局
 bottomBuff = [0 displayInfo.screenYpixels-displayInfo.screenAdj/2 displayInfo.screenXpixels displayInfo.screenYpixels]; %black bar at bottom of screen
 
 %% Task Parameters
 
 dists_n = 3; % 3 kind of disciances
-UniRandRadius = 50;
+UniRandRadius = 50; % 单位 pixels，随机扰动范围
 edgesize = 50;
 hitrates = [0.3];
  
 rep = 10; % repeat 10 times of 3 (kind of distances)* 2(directions) 
-distances = linspace(edgesize,displayInfo.windowRect(3)-edgesize,dists_n+2)-edgesize;
-distances = repmat(distances(2:end-1),1,length(hitrates)*rep);
+
 scorebar_length = 200;
 
-mmsigma = [30]; % !! needs to be extraced from previous data
+mmsigma = [30]; % !! needs to be extraced from previous data %目标大小的标准差
 target_sizes = tSizeGen(mmsigma,hitrates,pixellength);
 target_sizes = repmat(target_sizes,1,dists_n*rep);
 target_sizes = target_sizes';
 target_sizes = target_sizes(:)'; 
 switch_scale = 1.5;
-lifespan = [1.0,0.6,0.8,0.4]; %[1.1,0.9,1.0,0.8,0.6,0.7]
-block_n = length(lifespan);
+lifespan = exp(linspace(log(0.4),log(1.2),5)); %[1.0,0.6,0.8,0.4]; %[1.1,0.9,1.0,0.8,0.6,0.7] 设定各blocks中target的不同时长  %lifespan控制了受试者实际可用的、逐渐减少的目标"可见e时间窗，这一时间越短，任务难度越高（因为受试者必须更快速地完成任务以取得更高分数）。
+block_n = length(lifespan); % 实验有4个blocks，每个block有10*3*2个trails
 %% Trial
 speedthreshold = 10; % pixel per second, equals to 2.48 mm/s
 data = [];
 traXtotal = [];
 traYtotal = [];
 testtimes = zeros(1,10000); % 10 seconds
-framerate = Screen('NominalFrameRate',displayInfo.window);
-frames = framerate * 5; % start/preparing page time out at 5 seconds
+framerate = Screen('NominalFrameRate',displayInfo.window); % 获取显示器的帧率
+frames = framerate * 5; % start/preparing page time out at 5 seconds % 计算 5 秒钟内的总帧数
 instruct = 'Good luck, try hard, and have fun!';
 HideCursor;
 Screen('FillRect', displayInfo.window, displayInfo.blackVal);
@@ -76,21 +86,37 @@ while true
     end
 end
 
-for j = 1:block_n
+for current_block = 1:block_n % j代表当前是第几个block
+    distances = [];
+    switch current_block
+        case 1
+            distances = [100];
+        case 2
+            distances = [100,200];
+        case 3
+            distances = [100,200,400];
+        case 4
+            distances = [200,400];
+        case 5
+            distances = [400];
+    end
+
+    distances = repmat(distances,1,length(hitrates)*rep); % 2:end-1 选取去掉第一个和最后一个点；然后将这三个距离重复10次 distances = [175, 350, 525, 175, 350, 525...
     seeds = [randperm(size(distances,2)), randperm(size(distances,2))];
-    randdists = distances(seeds);
+    randdists = distances(seeds); % 按照 seeds 的顺序重新排列 distances，形成 randdists；randdists 代表 每次实验中的目标距离（随机排列后）。
     randdists = randdists(:);
     randsizes = target_sizes(seeds);
     randsizes = randsizes(:);
-    params = NaN(length(randdists),11);
-    trax = NaN(length(randdists),round(framerate * (wait+lifespan(j)+patience)));
-    tray = NaN(length(randdists),round(framerate * (wait+lifespan(j)+patience)));
-    trial_n = length(randdists);
+    params = NaN(length(randdists),11); % 会用实验数据覆盖 NaN 值。
+    trax = NaN(length(randdists),round(framerate * (wait+lifespan(current_block)+patience)));
+    tray = NaN(length(randdists),round(framerate * (wait+lifespan(current_block)+patience)));
+    trial_n = length(randdists); % trial_n 计算当前 block 内试验次数
     trials = ones(1,trial_n);
     i = 0;
-    DrawFormattedText(displayInfo.window,['Next Block: ' num2str(lifespan(j)) ' seconds interval'],'center','center',displayInfo.whiteVal); % not sure how to get this centered yet
+    DrawFormattedText(displayInfo.window,['Next Block: ' num2str(lifespan(current_block)) ' seconds interval'],'center','center',displayInfo.whiteVal); % not sure how to get this centered yet
     Screen('Flip', displayInfo.window);
     pause(2);
+
     while sum(trials) > 0
         i = i+1;
         stage = 0;
@@ -101,9 +127,9 @@ for j = 1:block_n
             params = [params ; params(trials==true,:)];
             trax = [trax ; trax(trials==true,:)];
             tray = [tray ; tray(trials==true,:)];
-            wrong_n = sum(trials);
+            wrong_n = sum(trials);  %计算失败的试验次数
             origin_trial_n = trial_n;
-            trial_n = trial_n + wrong_n;
+            trial_n = trial_n + wrong_n; %更新试验总数，确保这些试验在下一轮执行
             trials = zeros(1,trial_n);
             trials(1,origin_trial_n+1:end) = 1;
         end
@@ -118,10 +144,10 @@ for j = 1:block_n
                 [x,y,buttons] = GetMouse(displayInfo.window2);
                 if rem(i,2)
                     startpos = [displayInfo.windowRect(3)-edgesize,displayInfo.yCenter];
-                    theta = -pi/12 + (pi/6) * rand(1);
+                    theta = -pi/12 + (pi/6) * rand(1); % 这个计算让 theta 在 [-pi/12, pi/12] 之间随机变化，表示目标的角度扰动：角度偏移 (范围：-15° 到 15°)
                     rho = randdists(i)-UniRandRadius + UniRandRadius * 2 * rand(1);
-                    [offset(1),offset(2)] = pol2cart(theta,rho);
-                    params(i,1:2) = startpos - offset;
+                    [offset(1),offset(2)] = pol2cart(theta,rho);   % pol2cart 是 MATLAB 极坐标转直角坐标的函数:[offset(1),offset(2)]=新目标坐标[x,y]; x=ρ⋅cos(θ), y=ρ⋅sin(θ)
+                    params(i,1:2) = startpos - offset; % params(i,1:2) 存储目标点坐标（包含扰动)，代表第 i 个试验的 (x, y) 目标位置
                 else
                     startpos =  [edgesize,displayInfo.yCenter];
                     theta = -pi/12 + (pi/6) * rand(1);
@@ -155,7 +181,7 @@ for j = 1:block_n
             Screen('FillRect', displayInfo.window, displayInfo.blackVal);
             Screen('Flip', displayInfo.window);
             time = GetSecs;
-            story = [wait, wait+lifespan(j), wait+lifespan(j)+patience]; 
+            story = [wait, wait+lifespan(current_block), wait+lifespan(current_block)+patience]; 
             % wait is the time during which the target stays the same size
             % for motor planning and perception
             % wait + lifespan is the time when the score drops to zero
@@ -177,7 +203,7 @@ for j = 1:block_n
                 if frame <= framerate * (story(3)+2)
                     Screen('DrawDots', displayInfo.window, startpos, start_size, [1 1 1],[],1); %Starting point
                     if frame >= framerate * story(1)
-                        percent_score = max(1-((frame ./ framerate)-story(1)) / lifespan(j),0);
+                        percent_score = max(1-((frame ./ framerate)-story(1)) / lifespan(current_block),0);
                     else 
                         percent_score = 1;
                     end
@@ -247,7 +273,7 @@ for j = 1:block_n
 
                                 if hit
                                     bar_color = [1 1 0];
-%                                         percent_score = max(1-(((frame+k) ./ framerate)-story(1)) / lifespan(j),0);
+%                                         percent_score = max(1-(((frame+k) ./ framerate)-story(1)) / lifespan(current_block),0);
                                         Screen('DrawDots',displayInfo.window, params(i,1:2), dot_size,[0 0 1],[],1);
                                         Screen('DrawDots', displayInfo.window, xy, 5, [1 0 0],[],1);
                                         Screen('DrawLine', displayInfo.window, bar_color, displayInfo.xCenter - percent_score * scorebar_length,displayInfo.yCenter-200, displayInfo.xCenter + percent_score * scorebar_length,displayInfo.yCenter-200,5);
