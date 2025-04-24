@@ -48,7 +48,7 @@ UniRandRadius = 50; % �?��? pixels，�?机扰动范围
 edgesize = 50;
 hitrates = [0.3];
  
-rep = 10; % repeat 10 times of 3 (kind of distances)* 2(directions) 
+rep = 3; % repe at 10 times of 3 (kind of distances)* 2(directions) 
 
 scorebar_length = 200;
 
@@ -65,8 +65,8 @@ block_n = length(lifespan); % 实验有4个blocks，�?个block有10*3*2个trail
 %% Trial
 speedthreshold = 10; % pixel per second, equals to 2.48 mm/s
 data = [];
-traXtotal = [];
-traYtotal = [];
+traXtotal = NaN(1,round(framerate * (wait+max(lifespan)+patience)));
+traYtotal = NaN(size(traXtotal));
 testtimes = zeros(1,10000); % 10 seconds
 framerate = Screen('NominalFrameRate',displayInfo.window); % 获�?�显示器的帧率
 frames = framerate * 5; % start/preparing page time out at 5 seconds % 计算 5 秒钟内的总帧数
