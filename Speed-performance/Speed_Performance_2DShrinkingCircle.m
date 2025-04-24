@@ -287,7 +287,7 @@ for current_block = 1:block_n % j代表当前是第几个block
                                     Screen('DrawDots', displayInfo.window, xy, 5, [1 0 0],[],1);
                                     Screen('DrawLine', displayInfo.window, bar_color, displayInfo.xCenter - percent_score * scorebar_length,displayInfo.yCenter-200, displayInfo.xCenter + percent_score * scorebar_length,displayInfo.yCenter-200,5);
                                     DrawFormattedText(displayInfo.window,['Miss :('],'center',displayInfo.yCenter-220, displayInfo.whiteVal);
-                                    DrawFormattedText(displayInfo.window,[num2str(length(trials)-sum(trials)+1) '/' num2str(length(distances)*2) ' finished'],'center','center', displayInfo.whiteVal);
+                                    DrawFormattedText(displayInfo.window,[num2str(length(trials)-sum(trials)+1) '/' num2str(length(seeds) ' finished'],'center','center', displayInfo.whiteVal);
                                     Screen('Flip', displayInfo.window);
                                     score = percent_score * 10 * hit;
                                 end
