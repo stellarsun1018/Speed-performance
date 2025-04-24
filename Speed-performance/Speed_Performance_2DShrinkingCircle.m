@@ -58,7 +58,9 @@ target_sizes = repmat(target_sizes,1,dists_n*rep);
 target_sizes = target_sizes';
 target_sizes = target_sizes(:)'; 
 switch_scale = 1.5;
-lifespan = exp(linspace(log(0.4),log(1.2),5)); %[1.0,0.6,0.8,0.4]; %[1.1,0.9,1.0,0.8,0.6,0.7] 设定各blocks中target的不同时长  %lifespan控制了受试者实际可用的、逐渐减少的目标"可见e时间窗，这一时间越短，任务难度越高（因为受试者必须更快速地完成任务以取得更高分数）。
+
+all_distances = exp(linspace(log(231),log(693),5));
+lifespan = [0.6,0.6*3^(0.25),0.6*3^(0.5)]; %[1.0,0.6,0.8,0.4]; %[1.1,0.9,1.0,0.8,0.6,0.7] 设定各blocks中target的不同时长  %lifespan控制了受试者实际可用的、逐渐减少的目标"可见e时间窗，这一时间越短，任务难度越高（因为受试者必须更快速地完成任务以取得更高分数）。
 block_n = length(lifespan); % 实验有4个blocks，每个block有10*3*2个trails
 %% Trial
 speedthreshold = 10; % pixel per second, equals to 2.48 mm/s
@@ -86,21 +88,16 @@ while true
     end
 end
 
-dur = [0.6,0.6*3^(0.25),0.6*3^(0.5)];
-dists = exp(linspace(log(231),log(693),5));
 
-for j = 1:3
-    switch j
+for current_block = 1:block_n % j代表当前是第几个block
+    switch current_block
         case 1
-            dist_for_curr_block = dists(1:3);
+            distances = all_distances(1:3);
         case 2
-            dist_for_curr_block = dists(2:4);
+            distances = all_distances(2:4);
         case 3
-            dist_for_curr_block = dists(3:5);
+            distances = all_distances(3:5);
     end
-
-    speed = dist_for_curr_block ./ dur(j)
-end
 
     distances = repmat(distances,1,length(hitrates)*rep); % 2:end-1 选取去掉第一个和最后一个点；然后将这三个距离重复10次 distances = [175, 350, 525, 175, 350, 525...
     seeds = [randperm(size(distances,2)), randperm(size(distances,2))];
