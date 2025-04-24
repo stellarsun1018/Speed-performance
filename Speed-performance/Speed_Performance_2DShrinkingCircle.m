@@ -86,20 +86,21 @@ while true
     end
 end
 
-for current_block = 1:block_n % j代表当前是第几个block
-    distances = [];
-    switch current_block
+dur = [0.6,0.6*3^(0.25),0.6*3^(0.5)];
+dists = exp(linspace(log(231),log(693),5));
+
+for j = 1:3
+    switch j
         case 1
-            distances = [100];
+            dist_for_curr_block = dists(1:3);
         case 2
-            distances = [100,200];
+            dist_for_curr_block = dists(2:4);
         case 3
-            distances = [100,200,400];
-        case 4
-            distances = [200,400];
-        case 5
-            distances = [400];
+            dist_for_curr_block = dists(3:5);
     end
+
+    speed = dist_for_curr_block ./ dur(j)
+end
 
     distances = repmat(distances,1,length(hitrates)*rep); % 2:end-1 选取去掉第一个和最后一个点；然后将这三个距离重复10次 distances = [175, 350, 525, 175, 350, 525...
     seeds = [randperm(size(distances,2)), randperm(size(distances,2))];
