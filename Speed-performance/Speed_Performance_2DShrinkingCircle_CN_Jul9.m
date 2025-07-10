@@ -52,12 +52,12 @@ rep = 3; % repeat 10 times of 3 (kind of dist)* 2(directions)
 
 scorebar_length = 200;
 
-mmsigma = [30]; % !! needs to be extraced from previous data %目标大小的标准差
+mmsigma = [30]; % !! needs to be extraced from previous data %目标大小的标准差 %控制精度的高斯标准差（单位 mm）
 target_sizes = tSizeGen(mmsigma,hitrates,pixellength);
 target_sizes = repmat(target_sizes,1,dists_n*rep);
 target_sizes = target_sizes';
 target_sizes = target_sizes(:)'; 
-switch_scale = 1.5;
+switch_scale = 1.5; % 
 
 all_distances = exp(linspace(log(231),log(693),5));
 lifespan = [0.6,0.6*3^(0.25),0.6*3^(0.5)]; %[1.0,0.6,0.8,0.4]; %[1.1,0.9,1.0,0.8,0.6,0.7] 设定各blocks中target的不同时长  %lifespan控制了受试者实际可用的、逐渐减少的目标"可见e时间窗，这一时间越短，任务难度越高（因为受试者必须更快速地完成任务以取得更高分数）。
@@ -287,7 +287,7 @@ for current_block = 1:block_n % j代表当前是第几个block
                                     Screen('DrawDots', displayInfo.window, xy, 5, [1 0 0],[],1);
                                     Screen('DrawLine', displayInfo.window, bar_color, displayInfo.xCenter - percent_score * scorebar_length,displayInfo.yCenter-200, displayInfo.xCenter + percent_score * scorebar_length,displayInfo.yCenter-200,5);
                                     DrawFormattedText(displayInfo.window,['Miss :('],'center',displayInfo.yCenter-220, displayInfo.whiteVal);
-                                    DrawFormattedText(displayInfo.window,[num2str(length(trials)-sum(trials)+1) '/' num2str(length(seeds) ' finished'],'center','center', displayInfo.whiteVal);
+                                    DrawFormattedText(displayInfo.window,[num2str(length(trials)-sum(trials)+1) '/' num2str(length(seeds)) ' finished'],'center','center', displayInfo.whiteVal);
                                     Screen('Flip', displayInfo.window);
                                     score = percent_score * 10 * hit;
                                 end

@@ -5,7 +5,11 @@ cd('C:\Users\labadmin\Documents\Qingjie-GitHub\Speed-performance');
 subj = 'pilot';  
 dateTime = clock;                % get time for seed             
 <<<<<<< HEAD
+<<<<<<< HEAD
 rng(sum(100*dateTime) );      % 也就是给每组实验/数据dataset 编一个编码，确保这组实验的可track  
+=======
+rng(sum(100*dateTime) );      % 也就是给�?组实验/数�?�dataset 编一个编�?，确�?这组实验的�?�track
+>>>>>>> ffd96f4eb089643e31ee93d0a79d39c4a58acc22
 =======
 rng(sum(100*dateTime) );      % 也就是给�?组实验/数�?�dataset 编一个编�?，确�?这组实验的�?�track
 >>>>>>> ffd96f4eb089643e31ee93d0a79d39c4a58acc22
@@ -53,7 +57,11 @@ edgesize = 50;
 hitrates = [0.3];
  
 <<<<<<< HEAD
+<<<<<<< HEAD
 rep = 3; % repeat 10 times of 3 (kind of dist)* 2(directions) 
+=======
+rep = 3; % repe at 10 times of 3 (kind of distances)* 2(directions) 
+>>>>>>> ffd96f4eb089643e31ee93d0a79d39c4a58acc22
 =======
 rep = 3; % repe at 10 times of 3 (kind of distances)* 2(directions) 
 >>>>>>> ffd96f4eb089643e31ee93d0a79d39c4a58acc22
