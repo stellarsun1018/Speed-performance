@@ -1,82 +1,70 @@
-clear all
+% clear all
 Screen('Preference', 'SkipSyncTests', 1); 
-cd('C:\Users\labadmin\Documents\Qingjie-GitHub\Speed-performance\Speed-performance\Speed-performance');
+cd('C:\Users\labadmin\Documents\onlineConfExperiment');
 
-subj = 'pilot';  
-dateTime = clock;                % get time for seed             
-rng(sum(100*dateTime) );      % 也就是给每组实验/数据dataset 编一个编码，确保这组实验的可track
-expName = 'practice_traj';
+subj = 'ZL';  
+dateTime = clock;                %get  s time for seed  
+rng(sum(100*dateTime) );
+expName = 'CustomeScale';
 session = 01;
 redoCalib = 0;
 
 [displayInfo] = startExp(subj,datetime,rng);
 [displayInfo] = screenVisuals(displayInfo);
-
-
 if exist(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) '_' date,'_tform.mat']) && redoCalib == 0
-    load(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) '_' date,'_tform.mat']) %load calibration in case of restart
+    load(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) '_' date,'_tform.mat']) %load calibration incase of restart
     load(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) '_' date,'_calibration.mat'])
     
 else
     [tform, calibration,startPhase] = penCalib(displayInfo);
-    save(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) '_' date,'_tform.mat'],'tform') % tform.mat —— 存储几何变换信息（坐标变换）
+    save(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) '_' date,'_tform.mat'],'tform')
     save(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) '_' date,'_calibration.mat'],'calibration')
 end
 mode = 0; % lift = 1, slide = 0
 %%
 start_size = 20;
 cursor_size = 5;
-pixellength = 0.248; % 每个像素对应的物理长度（单位 mm）
-wait = 0.5;
+pixellength = 0.248;
+wait = 1;
 patience = 0.5;
-% story(1) = wait：等待阶段（目标显示但不能移动）
-% story(2) = wait + lifespan(current_block)：目标开始消失
-% story(3) = wait + lifespan(current_block) + patience：实验的最后时限
-
-% 例如，第二个block中：
-% 
-% 等待阶段：wait = 0.5秒（目标出现，无法移动，仅观察）
-% 目标逐渐消失阶段：lifespan = 0.6秒（目标尺寸从满值逐渐减小到零，得分逐渐从满分降低到零）
-% 最大忍耐等待时长：patience = 0.5秒（再过0.5秒若仍未完成动作，试验将强制结束）
-% 总时间长度 = wait + lifespan + patience = 0.5 + 0.6 + 0.5 = 1.6秒
-
-topBuff = [0 0 displayInfo.screenXpixels displayInfo.screenAdj/2]; %black bar at top of screen 设置顶部和底部的黑色缓冲区域，用于实验界面布局
+topBuff = [0 0 displayInfo.screenXpixels displayInfo.screenAdj/2]; %black bar at top of screen
 bottomBuff = [0 displayInfo.screenYpixels-displayInfo.screenAdj/2 displayInfo.screenXpixels displayInfo.screenYpixels]; %black bar at bottom of screen
 
 %% Task Parameters
 
-dists_n = 3; % 3 kind of disciances
-UniRandRadius = 50; % 单位 pixels，随机扰动范围
+dists_n = 3;
+size_n = 5;
+UniRandRadius = 50;
 edgesize = 50;
-hitrates = [0.3];
- 
-rep = 12; % repeat 10 times of 3 (kind of dist)* 2(directions)  
 
+
+rep = 2;
+distances = linspace(edgesize,displayInfo.windowRect(3)-edgesize,dists_n+2)-edgesize;
+distances = repmat(distances(2:end-1),1,size_n*rep);
 scorebar_length = 200;
+penalty = 0.2;
 
-mmsigma = [30]; % !! needs to be extraced from previous data %目标大小的标准差 %控制精度的高斯标准差（单位 mm）
-target_sizes = tSizeGen(mmsigma,hitrates,pixellength);
+% mmsigma = [15]; % !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! needs to be extraced from previous data
+% target_sizes = tSizeGen(mmsigma,hitrates,pixellength);
+target_sizes = [3;3.5;4;4.5;5] ./ pixellength; % useful range that I simulated
 target_sizes = repmat(target_sizes,1,dists_n*rep);
 target_sizes = target_sizes';
-target_sizes = target_sizes(:)'; 
-switch_scale = 1.5; % 
-
-all_distances = exp(linspace(log(231),log(693),5));
-lifespan = [0.6,0.6*3^(0.25),0.6*3^(0.5)]; %[1.0,0.6,0.8,0.4]; %[1.1,0.9,1.0,0.8,0.6,0.7] 设定各blocks中target的不同时长  %lifespan控制了受试者实际可用的、逐渐减少的目标"可见e时间窗，这一时间越短，任务难度越高（因为受试者必须更快速地完成任务以取得更高分数）。
-block_n = length(lifespan); % 实验有4个blocks，每个block有10*3*2个trails
+target_sizes = target_sizes(:)';
+switch_scale = 1.5;
+lifespan = [3,3,3,3,3,3];
+gap_n = length(lifespan);
 %% Trial
 speedthreshold = 10; % pixel per second, equals to 2.48 mm/s
 data = [];
 traXtotal = [];
 traYtotal = [];
 testtimes = zeros(1,10000); % 10 seconds
-framerate = Screen('NominalFrameRate',displayInfo.window); % 获取显示器的帧率
-frames = framerate * 5; % start/preparing page time out at 5 seconds % 计算 5 秒钟内的总帧数
+framerate = Screen('NominalFrameRate',displayInfo.window);
+frames = framerate * 5; % start/preparing page time out at 5 seconds
 instruct = 'Good luck, try hard, and have fun!';
 HideCursor;
 Screen('FillRect', displayInfo.window, displayInfo.blackVal);
  
-
 while true
     DrawFormattedText(displayInfo.window,instruct,'center','center', displayInfo.whiteVal); 
     Screen('Flip', displayInfo.window);
@@ -90,33 +78,21 @@ while true
     end
 end
 
-
-for current_block = 1:block_n % j代表当前是第几个block
-    switch current_block
-        case 1
-            distances = all_distances(1:3);
-        case 2
-            distances = all_distances(2:4);
-        case 3
-            distances = all_distances(3:5);
-    end
-
-    distances = repmat(distances,1,length(hitrates)*rep); % 2:end-1 选取去掉第一个和最后一个点；然后将这三个距离重复10次 distances = [175, 350, 525, 175, 350, 525...
+for j = 1:gap_n
     seeds = [randperm(size(distances,2)), randperm(size(distances,2))];
-    randdists = distances(seeds); % 按照 seeds 的顺序重新排列 distances，形成 randdists；randdists 代表 每次实验中的目标距离（随机排列后）。
+    randdists = distances(seeds);
     randdists = randdists(:);
     randsizes = target_sizes(seeds);
     randsizes = randsizes(:);
-    params = NaN(length(randdists),11); % 会用实验数据覆盖 NaN 值。
-    trax = NaN(length(randdists),round(framerate * (wait+max(lifespan)+patience)));
-    tray = NaN(length(randdists),round(framerate * (wait+max(lifespan)+patience)));
-    trial_n = length(randdists); % trial_n 计算当前 block 内试验次数
+    params = NaN(length(randdists),11);
+    trax = NaN(length(randdists),round(framerate * (wait+lifespan(j)+patience)));
+    tray = NaN(length(randdists),round(framerate * (wait+lifespan(j)+patience)));
+    trial_n = length(randdists);
     trials = ones(1,trial_n);
     i = 0;
-    DrawFormattedText(displayInfo.window,['Next Block: ' num2str(lifespan(current_block)) ' seconds interval'],'center','center',displayInfo.whiteVal); % not sure how to get this centered yet
+    DrawFormattedText(displayInfo.window,['Next Block: ' num2str(lifespan(j)) ' seconds interval'],'center','center',displayInfo.whiteVal); % not sure how to get this centered yet
     Screen('Flip', displayInfo.window);
     pause(2);
-
     while sum(trials) > 0
         i = i+1;
         stage = 0;
@@ -127,9 +103,9 @@ for current_block = 1:block_n % j代表当前是第几个block
             params = [params ; params(trials==true,:)];
             trax = [trax ; trax(trials==true,:)];
             tray = [tray ; tray(trials==true,:)];
-            wrong_n = sum(trials);  %计算失败的试验次数
+            wrong_n = sum(trials);
             origin_trial_n = trial_n;
-            trial_n = trial_n + wrong_n; %更新试验总数，确保这些试验在下一轮执行
+            trial_n = trial_n + wrong_n;
             trials = zeros(1,trial_n);
             trials(1,origin_trial_n+1:end) = 1;
         end
@@ -144,10 +120,10 @@ for current_block = 1:block_n % j代表当前是第几个block
                 [x,y,buttons] = GetMouse(displayInfo.window2);
                 if rem(i,2)
                     startpos = [displayInfo.windowRect(3)-edgesize,displayInfo.yCenter];
-                    theta = -pi/12 + (pi/6) * rand(1); % 这个计算让 theta 在 [-pi/12, pi/12] 之间随机变化，表示目标的角度扰动：角度偏移 (范围：-15° 到 15°)
+                    theta = -pi/12 + (pi/6) * rand(1);
                     rho = randdists(i)-UniRandRadius + UniRandRadius * 2 * rand(1);
-                    [offset(1),offset(2)] = pol2cart(theta,rho);   % pol2cart 是 MATLAB 极坐标转直角坐标的函数:[offset(1),offset(2)]=新目标坐标[x,y]; x=ρ⋅cos(θ), y=ρ⋅sin(θ)
-                    params(i,1:2) = startpos - offset; % params(i,1:2) 存储目标点坐标（包含扰动)，代表第 i 个试验的 (x, y) 目标位置
+                    [offset(1),offset(2)] = pol2cart(theta,rho);
+                    params(i,1:2) = startpos - offset;
                 else
                     startpos =  [edgesize,displayInfo.yCenter];
                     theta = -pi/12 + (pi/6) * rand(1);
@@ -156,11 +132,16 @@ for current_block = 1:block_n % j代表当前是第几个block
                     params(i,1:2) = startpos + offset;
                 end
                 params(i,10) = randsizes(i);
+                distanceLookUpI = round(rho*pixellength/10)-8;
+                targetLookUpI = round(params(i,10)*pixellength/0.1) - 19;
+                switch_scale = alt_scale(targetLookUpI,distanceLookUpI);
+                if isnan(switch_scale)
+                    switch_scale = 4;
+                end
                 switch_size = switch_scale * params(i,10);
-                Screen('DrawDots', displayInfo.window, startpos, start_size, [1 1 1] * displayInfo.whiteVal,[],1);
+                Screen('DrawDots', displayInfo.window, startpos, start_size, [1 1 1],[],1);
                 [xy(1), xy(2)]  = transformPointsForward(tform,x,y);
-                Screen('DrawDots', displayInfo.window, xy, 5, [1 0 0] * displayInfo.whiteVal,[],1);
-                
+                Screen('DrawDots', displayInfo.window, xy, 5, [1 0 0],[],1);
                 if buttons(1)
                     if sqrt(sum((xy - startpos).^2)) <= start_size % if in start area
                         stage = 1;
@@ -178,19 +159,15 @@ for current_block = 1:block_n % j代表当前是第几个block
         %     plot(t_diff)
         %     rfrate = 1/mean(t_diff);
         %     worst_rfrate = 1/max(t_diff);
-        if stage == 1
+        if stage == 1 % all variable value flushing can happen here
             Screen('FillRect', displayInfo.window, displayInfo.blackVal);
             Screen('Flip', displayInfo.window);
             time = GetSecs;
-            story = [wait, wait+lifespan(current_block), wait+lifespan(current_block)+patience]; 
-            % wait is the time during which the target stays the same size
-            % for motor planning and perception
-            % wait + lifespan is the time when the score drops to zero
-            % wait + lifespan + patience is the time before the trial force
-            % quits because we ran out of patience for waiting for the 
-            % participant to move their stylus from the starting point
+            story = [wait, wait+lifespan(j), wait+lifespan(j)+patience];
             t = 1;
             onset_recorded = 0;
+            switch_recorded = 0;
+            switch_time = 0;
             [x,y,~] = GetMouse(displayInfo.window2);
             tSize = params(i,10);
             for frame = 1: framerate * (story(3)+2) 
@@ -199,26 +176,18 @@ for current_block = 1:block_n % j代表当前是第几个block
                 locdiff = sqrt(sum((cache - [x,y]).^2));
                 trax(i,frame) = x;
                 tray(i,frame) = y;
-                [xy(1), xy(2)]  = transformPointsForward(tform,x,y); 
-                max_dot_size = 189; % GPU support
+                [xy(1), xy(2)]  = transformPointsForward(tform,x,y);
+                
                 if frame <= framerate * (story(3)+2)
-                    Screen('DrawDots', displayInfo.window, startpos, start_size, [1 1 1] * displayInfo.whiteVal,[],1); %Starting point
+                    Screen('DrawDots', displayInfo.window, startpos, start_size, [1 1 1],[],1);
                     if frame >= framerate * story(1)
-                        percent_score = max(1-((frame ./ framerate)-story(1)) / lifespan(current_block),0);
-                    else 
-                        percent_score = 1;
-                    end
-                        dot_size = max(min(percent_score * max_dot_size, max_dot_size),1); % limit the dot size
-                        Screen('DrawDots', displayInfo.window, params(i,1:2), dot_size, [0 0 1] * displayInfo.whiteVal, [], 1);
-                            % draw center safety dot (black)
-                        Screen('DrawDots', displayInfo.window, params(i,1:2), 7, [0 0 0], [], 1);
-
-                        %Screen('DrawDots', displayInfo.window, params(i,1:2), 2 * percent_score * scorebar_length, [0 0 1] * displayInfo.whiteVal, [], 1);
-                        Screen('DrawLine', displayInfo.window, [1 1 1] * displayInfo.whiteVal, displayInfo.xCenter - percent_score * scorebar_length,displayInfo.yCenter-200, displayInfo.xCenter + percent_score * scorebar_length,displayInfo.yCenter-200,5);
+                        percent_score = max(1-((frame ./ framerate)-story(1)) / lifespan(j),0);
+                        Screen('DrawDots',displayInfo.window, params(i,1:2), tSize,[0 1 0],[],1);
+                        Screen('FrameOval',displayInfo.window, [1 1 0], [params(i,1)-switch_size./2,params(i,2)-switch_size./2,params(i,1)+switch_size./2,params(i,2)+switch_size./2]);
+                        Screen('DrawLine', displayInfo.window, [1 1 1], displayInfo.xCenter - percent_score * scorebar_length,displayInfo.yCenter-200, displayInfo.xCenter + percent_score * scorebar_length,displayInfo.yCenter-200,5);
                         DrawFormattedText(displayInfo.window,['Score = ' num2str(percent_score * 10)],'center',displayInfo.yCenter-220, displayInfo.whiteVal);
-                    
+                    end
                     Screen('Flip', displayInfo.window);
-                    
                     if frame > framerate * story(3) 
                         DrawFormattedText(displayInfo.window,'Too Slow!','center','center', displayInfo.whiteVal); % not sure how to get this centered yet
                         Screen('Flip',displayInfo.window);
@@ -248,8 +217,10 @@ for current_block = 1:block_n % j代表当前是第几个block
                             onset_recorded = 1;
                         end
                         [keyIsDown,~,keyCode] = KbCheck;
-                        TarUB = params(i,1)- percent_score * scorebar_length;
-                        TarLB = params(i,1)+ percent_score * scorebar_length;
+                        if find(keyCode) == 161 % 161 for Win, 229 for Mac
+                            switch_time = frame / framrate;
+                            switch_recorded = 1;
+                        end
                         if (locdiff <= speedthreshold/framerate && ~mode) || (buttons(1) && mode)
                             if norm(xy - startpos) < randdists(i)/2
                                 DrawFormattedText(displayInfo.window,'Not Even Close :(','center','center', displayInfo.whiteVal);
@@ -257,50 +228,44 @@ for current_block = 1:block_n % j代表当前是第几个block
                                 trials(i) = 1;
                                 pause(1)  
                             else
-                                distance_to_target = sqrt((xy(1) - params(i,1))^2 + (xy(2) - params(i,2))^2);
-
-                                if distance_to_target <= dot_size./2
-                                    hit = 1; % success hit
-                                    bar_color = [1 1 1] * displayInfo.whiteVal; % white
-                                else
-                                    hit = 0; % no
-                                    bar_color = [1 0 0] * displayInfo.whiteVal; % red
-                                end                                
-                                end_t = frame / framerate; %initialize end_t
+                                end_t = frame / framerate;
                                 endpos = [x y];
-%                                 hit = 1;
-%                                 bar_color = [1 1 1] * displayInfo.whiteVal;
-%                                 if xy(1) < TarUB || xy(1) > TarLB
-%                                     hit = 0;
-%                                     bar_color = [1 0 0] * displayInfo.whiteVal;  
-
-                                if hit 
-                                    bar_color = [1 1 0] * displayInfo.whiteVal;
-%                                         percent_score = max(1-(((frame+k) ./ framerate)-story(1)) / lifespan(current_block),0);
-                                        Screen('DrawDots', displayInfo.window, params(i,1:2), dot_size, [0 0 1] * displayInfo.whiteVal, [], 1);
-                                        Screen('DrawDots', displayInfo.window, params(i,1:2), 7, [0 0 0], [], 1);  % 黑色中心点
-                                        Screen('DrawDots', displayInfo.window, xy, 5, [1 0 0] * displayInfo.whiteVal,[],1);
+                                hit = 1;
+                                bar_color = [1 1 1];
+                                if norm(xy - params(i,1:2)) > tSize/2
+                                    hit = 0;
+                                    bar_color = [1 0 0];
+                                end
+                                if switch_recorded && hit
+                                    end_t = end_t + penalty;
+                                    bar_color = [1 1 0];
+                                    for k = 1:framerate * penalty
+                                        percent_score = max(1-(((frame+k) ./ framerate)-story(1)) / lifespan(j),0);
+                                        Screen('DrawDots',displayInfo.window, params(i,1:2), switch_size,[0 1 0],[],1);
+                                        Screen('DrawDots', displayInfo.window, xy, 5, [1 0 0],[],1);
                                         Screen('DrawLine', displayInfo.window, bar_color, displayInfo.xCenter - percent_score * scorebar_length,displayInfo.yCenter-200, displayInfo.xCenter + percent_score * scorebar_length,displayInfo.yCenter-200,5);
                                         DrawFormattedText(displayInfo.window,['Score = ' num2str(percent_score * 10)],'center',displayInfo.yCenter-220, displayInfo.whiteVal);
-                                        % DrawFormattedText(displayInfo.window,[num2str(length(trials)-sum(trials)) '/' num2str(length(distances)) ' finished'],'center','center', displayInfo.whiteVal);
+                                        DrawFormattedText(displayInfo.window,[num2str(length(trials)-sum(trials)) '/' num2str(length(distances)) ' finished'],'center','center', displayInfo.whiteVal);
                                         Screen('Flip', displayInfo.window);
+                                    end
                                     score = percent_score * 10 * hit;
                                 else
-%                                     dot_size = tSize;
-                                    Screen('DrawDots', displayInfo.window, params(i,1:2), dot_size, [0 0 1] * displayInfo.whiteVal, [], 1);
-                                    Screen('DrawDots', displayInfo.window, params(i,1:2), 7, [0 0 0], [], 1);  % 黑色中心点
-%                                     Screen('DrawDots',displayInfo.window, params(i,1:2), tSize,[0 1 0] * displayInfo.whiteVal,[],1);
-%                                     Screen('FrameOval',displayInfo.window, [1 1 0] * displayInfo.whiteVal, [params(i,1)-switch_size./2,params(i,2)-switch_size./2,params(i,1)+switch_size./2,params(i,2)+switch_size./2]);
-                                    Screen('DrawDots', displayInfo.window, xy, 5, [1 0 0] * displayInfo.whiteVal,[],1);
+                                    Screen('DrawDots',displayInfo.window, params(i,1:2), tSize,[0 1 0],[],1);
+                                    Screen('FrameOval',displayInfo.window, [1 1 0], [params(i,1)-switch_size./2,params(i,2)-switch_size./2,params(i,1)+switch_size./2,params(i,2)+switch_size./2]);
+                                    Screen('DrawDots', displayInfo.window, xy, 5, [1 0 0],[],1);
                                     Screen('DrawLine', displayInfo.window, bar_color, displayInfo.xCenter - percent_score * scorebar_length,displayInfo.yCenter-200, displayInfo.xCenter + percent_score * scorebar_length,displayInfo.yCenter-200,5);
-                                    DrawFormattedText(displayInfo.window,['Miss :('],'center',displayInfo.yCenter-220, displayInfo.whiteVal);
-                                    % DrawFormattedText(displayInfo.window,[num2str(length(trials)-sum(trials)+1) '/' num2str(length(seeds)) ' finished'],'center','center', displayInfo.whiteVal);
+                                    if hit
+                                        DrawFormattedText(displayInfo.window,['Score = ' num2str(percent_score * 10)],'center',displayInfo.yCenter-220, displayInfo.whiteVal);
+                                    else
+                                        DrawFormattedText(displayInfo.window,['Miss :('],'center',displayInfo.yCenter-220, displayInfo.whiteVal);
+                                    end
+                                    DrawFormattedText(displayInfo.window,[num2str(length(trials)-sum(trials)+1) '/' num2str(length(distances)*2) ' finished'],'center','center', displayInfo.whiteVal);
                                     Screen('Flip', displayInfo.window);
                                     score = percent_score * 10 * hit;
                                 end
                                 rest_of_trial = story(3) - end_t;
                                 pause(rest_of_trial);
-                                params(i,3) = 0;
+                                params(i,3) = switch_time;
                                 params(i,5) = end_t;
                                 params(i,6:7) = endpos;
                                 params(i,8:9) = startpos;
@@ -325,13 +290,16 @@ for current_block = 1:block_n % j代表当前是第几个block
     end
     data = [data;params];
     save(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) 'c_' date,'_rawtotal.mat'],'data');
-
-    traXtotal = [traXtotal;trax];
-    traYtotal = [traYtotal;tray];
+    xTrajTelomere = NaN(size(trax,1),size(traXtotal,2));
+    xTrajTelomere(1:size(trax,1),1:size(trax,2)) = trax;
+    traXtotal = [traXtotal;xTrajTelomere];
+    yTrajTelomere = NaN(size(tray,1),size(traYtotal,2));
+    yTrajTelomere(1:size(tray,1),1:size(tray,2)) = tray;
+    traYtotal = [traYtotal;yTrajTelomere];
     save(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) 'c_' date,'_traXtotal.mat'],'traXtotal')
     save(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) 'c_' date,'_traYtotal.mat'],'traYtotal')
     while true
-        DrawFormattedText(displayInfo.window,'Block finished. Press any key to proceed to next block.','center','center', displayInfo.whiteVal); 
+        DrawFormattedText(displayInfo.window,'Block finished. Press any key to proceed to next block.','center','center', displayInfo.whiteVal); % not sure how to get this centered yet
         Screen('Flip', displayInfo.window);
         if KbCheck
             break
@@ -341,8 +309,8 @@ end
 Screen('CloseAll');
 ShowCursor;
 %%
-index = NaN(size(data,1),1);
-for i = 1:size(data,1)
+index = NaN(length(data),1);
+for i = 1:length(data)
     index(i) = ~isnan(sum(data(i,:)));
 end
 valid = data(index==true,:);
@@ -359,7 +327,7 @@ copy(:,[13,14]) = [copy(:,6)*pixellength (1080 - copy(:,7))*pixellength]; % 1080
 copy(:,15) = valid(:,10) .* pixellength;
 copy(:,16) = copy(:,5) - copy(:,4);
 copy(:,17) = sqrt( (copy(:,13)-copy(:,11)).^2 + (copy(:,14)-copy(:,12)).^2 );
-copy(:,27) = 1:size(copy,1);
+copy(:,27) = 1:length(copy);
 copy(:,19:20) = (copy(:,6:7) - copy(:,8:9)) .* pixellength;
 copy(:,21) = sqrt(sum((copy(:,6:7) - copy(:,8:9)).^2,2)) .* pixellength;
 copy(:,22) = copy(:,21) ./ copy(:,16);
@@ -367,6 +335,11 @@ copy(:,[24,25]) = (copy(:,1:2) - copy(:,8:9)) .* pixellength;% relative target c
 copy(:,23) = (abs(dot(copy(:,19:20),copy(:,24:25),2) ./ dot(copy(:,24:25),copy(:,24:25),2)) - 1) .*copy(:,10);
 copy(:,26) = valid(:,11);
 copy(:,28) = copy(:,26) ~= 0;
+endPoints = (copy(:,6:7) - copy(:,8:9)) .* pixellength;% relative endpoint coordinate
+projScale = (abs(dot(copy(:,19:20),copy(:,24:25),2) ./ dot(copy(:,24:25),copy(:,24:25),2)));
+rejections = endPoints - projScale.* copy(:,24:25);
+rejLength = sqrt(rejections(:,1).^2 + rejections(:,2).^2);
+copy(:,29) = rejLength;
 %%
 save(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) '_' date,'_trialdata.mat'],'copy')
 %%
@@ -384,7 +357,7 @@ save(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) '_' dat
 % 17: error size in mm
 % 18: switch logical array
 % 19,20: start position in mm
-% 21: actual reach distance 
+% 21: actual reach distance
 % 22: average speed
 % 23: error along the reach direction (vector projection) in mm
 % 24,25: relative target position in mm
