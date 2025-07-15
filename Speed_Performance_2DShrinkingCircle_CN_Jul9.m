@@ -1,6 +1,6 @@
 clear all
 Screen('Preference', 'SkipSyncTests', 1); 
-cd('C:\Users\labadmin\Documents\Qingjie-GitHub\Speed-performance\Speed-performance\Speed-performance');
+cd('C:\Users\labadmin\Documents\Qingjie-GitHub\Speed-performance');
 
 subj = 'pilot';  
 dateTime = clock;                % get time for seed             
@@ -11,8 +11,6 @@ redoCalib = 0;
 
 [displayInfo] = startExp(subj,datetime,rng);
 [displayInfo] = screenVisuals(displayInfo);
-
-
 if exist(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) '_' date,'_tform.mat']) && redoCalib == 0
     load(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) '_' date,'_tform.mat']) %load calibration in case of restart
     load(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) '_' date,'_calibration.mat'])
@@ -50,7 +48,7 @@ UniRandRadius = 50; % 单位 pixels，随机扰动范围
 edgesize = 50;
 hitrates = [0.3];
  
-rep = 12; % repeat 10 times of 3 (kind of dist)* 2(directions)  
+rep = 3; % repeat 10 times of 3 (kind of dist)* 2(directions) 
 
 scorebar_length = 200;
 
@@ -108,8 +106,8 @@ for current_block = 1:block_n % j代表当前是第几个block
     randsizes = target_sizes(seeds);
     randsizes = randsizes(:);
     params = NaN(length(randdists),11); % 会用实验数据覆盖 NaN 值。
-    trax = NaN(length(randdists),round(framerate * (wait+max(lifespan)+patience)));
-    tray = NaN(length(randdists),round(framerate * (wait+max(lifespan)+patience)));
+    trax = NaN(length(randdists),round(framerate * (wait+lifespan(current_block)+patience)));
+    tray = NaN(length(randdists),round(framerate * (wait+lifespan(current_block)+patience)));
     trial_n = length(randdists); % trial_n 计算当前 block 内试验次数
     trials = ones(1,trial_n);
     i = 0;
@@ -157,10 +155,9 @@ for current_block = 1:block_n % j代表当前是第几个block
                 end
                 params(i,10) = randsizes(i);
                 switch_size = switch_scale * params(i,10);
-                Screen('DrawDots', displayInfo.window, startpos, start_size, [1 1 1] * displayInfo.whiteVal,[],1);
+                Screen('DrawDots', displayInfo.window, startpos, start_size, [1 1 1],[],1);
                 [xy(1), xy(2)]  = transformPointsForward(tform,x,y);
-                Screen('DrawDots', displayInfo.window, xy, 5, [1 0 0] * displayInfo.whiteVal,[],1);
-                
+                Screen('DrawDots', displayInfo.window, xy, 5, [1 0 0],[],1);
                 if buttons(1)
                     if sqrt(sum((xy - startpos).^2)) <= start_size % if in start area
                         stage = 1;
@@ -202,19 +199,17 @@ for current_block = 1:block_n % j代表当前是第几个block
                 [xy(1), xy(2)]  = transformPointsForward(tform,x,y); 
                 max_dot_size = 189; % GPU support
                 if frame <= framerate * (story(3)+2)
-                    Screen('DrawDots', displayInfo.window, startpos, start_size, [1 1 1] * displayInfo.whiteVal,[],1); %Starting point
+                    Screen('DrawDots', displayInfo.window, startpos, start_size, [1 1 1],[],1); %Starting point
                     if frame >= framerate * story(1)
                         percent_score = max(1-((frame ./ framerate)-story(1)) / lifespan(current_block),0);
                     else 
                         percent_score = 1;
                     end
                         dot_size = max(min(percent_score * max_dot_size, max_dot_size),1); % limit the dot size
-                        Screen('DrawDots', displayInfo.window, params(i,1:2), dot_size, [0 0 1] * displayInfo.whiteVal, [], 1);
-                            % draw center safety dot (black)
-                        Screen('DrawDots', displayInfo.window, params(i,1:2), 7, [0 0 0], [], 1);
+                        Screen('DrawDots', displayInfo.window, params(i,1:2), dot_size, [0 0 1], [], 1);
 
-                        %Screen('DrawDots', displayInfo.window, params(i,1:2), 2 * percent_score * scorebar_length, [0 0 1] * displayInfo.whiteVal, [], 1);
-                        Screen('DrawLine', displayInfo.window, [1 1 1] * displayInfo.whiteVal, displayInfo.xCenter - percent_score * scorebar_length,displayInfo.yCenter-200, displayInfo.xCenter + percent_score * scorebar_length,displayInfo.yCenter-200,5);
+                        %Screen('DrawDots', displayInfo.window, params(i,1:2), 2 * percent_score * scorebar_length, [0 0 1], [], 1);
+                        Screen('DrawLine', displayInfo.window, [1 1 1], displayInfo.xCenter - percent_score * scorebar_length,displayInfo.yCenter-200, displayInfo.xCenter + percent_score * scorebar_length,displayInfo.yCenter-200,5);
                         DrawFormattedText(displayInfo.window,['Score = ' num2str(percent_score * 10)],'center',displayInfo.yCenter-220, displayInfo.whiteVal);
                     
                     Screen('Flip', displayInfo.window);
@@ -261,40 +256,38 @@ for current_block = 1:block_n % j代表当前是第几个block
 
                                 if distance_to_target <= dot_size./2
                                     hit = 1; % success hit
-                                    bar_color = [1 1 1] * displayInfo.whiteVal; % white
+                                    bar_color = [1 1 1]; % white
                                 else
                                     hit = 0; % no
-                                    bar_color = [1 0 0] * displayInfo.whiteVal; % red
+                                    bar_color = [1 0 0]; % red
                                 end                                
                                 end_t = frame / framerate; %initialize end_t
                                 endpos = [x y];
 %                                 hit = 1;
-%                                 bar_color = [1 1 1] * displayInfo.whiteVal;
+%                                 bar_color = [1 1 1];
 %                                 if xy(1) < TarUB || xy(1) > TarLB
 %                                     hit = 0;
-%                                     bar_color = [1 0 0] * displayInfo.whiteVal;  
+%                                     bar_color = [1 0 0];  
 
-                                if hit 
-                                    bar_color = [1 1 0] * displayInfo.whiteVal;
+                                if hit
+                                    bar_color = [1 1 0];
 %                                         percent_score = max(1-(((frame+k) ./ framerate)-story(1)) / lifespan(current_block),0);
-                                        Screen('DrawDots', displayInfo.window, params(i,1:2), dot_size, [0 0 1] * displayInfo.whiteVal, [], 1);
-                                        Screen('DrawDots', displayInfo.window, params(i,1:2), 7, [0 0 0], [], 1);  % 黑色中心点
-                                        Screen('DrawDots', displayInfo.window, xy, 5, [1 0 0] * displayInfo.whiteVal,[],1);
+                                        Screen('DrawDots',displayInfo.window, params(i,1:2), dot_size,[0 0 1],[],1);
+                                        Screen('DrawDots', displayInfo.window, xy, 5, [1 0 0],[],1);
                                         Screen('DrawLine', displayInfo.window, bar_color, displayInfo.xCenter - percent_score * scorebar_length,displayInfo.yCenter-200, displayInfo.xCenter + percent_score * scorebar_length,displayInfo.yCenter-200,5);
                                         DrawFormattedText(displayInfo.window,['Score = ' num2str(percent_score * 10)],'center',displayInfo.yCenter-220, displayInfo.whiteVal);
-                                        % DrawFormattedText(displayInfo.window,[num2str(length(trials)-sum(trials)) '/' num2str(length(distances)) ' finished'],'center','center', displayInfo.whiteVal);
+                                        DrawFormattedText(displayInfo.window,[num2str(length(trials)-sum(trials)) '/' num2str(length(distances)) ' finished'],'center','center', displayInfo.whiteVal);
                                         Screen('Flip', displayInfo.window);
                                     score = percent_score * 10 * hit;
                                 else
 %                                     dot_size = tSize;
-                                    Screen('DrawDots', displayInfo.window, params(i,1:2), dot_size, [0 0 1] * displayInfo.whiteVal, [], 1);
-                                    Screen('DrawDots', displayInfo.window, params(i,1:2), 7, [0 0 0], [], 1);  % 黑色中心点
-%                                     Screen('DrawDots',displayInfo.window, params(i,1:2), tSize,[0 1 0] * displayInfo.whiteVal,[],1);
-%                                     Screen('FrameOval',displayInfo.window, [1 1 0] * displayInfo.whiteVal, [params(i,1)-switch_size./2,params(i,2)-switch_size./2,params(i,1)+switch_size./2,params(i,2)+switch_size./2]);
-                                    Screen('DrawDots', displayInfo.window, xy, 5, [1 0 0] * displayInfo.whiteVal,[],1);
+                                    Screen('DrawDots', displayInfo.window, params(i,1:2), dot_size, [0 0 1], [], 1);
+%                                     Screen('DrawDots',displayInfo.window, params(i,1:2), tSize,[0 1 0],[],1);
+%                                     Screen('FrameOval',displayInfo.window, [1 1 0], [params(i,1)-switch_size./2,params(i,2)-switch_size./2,params(i,1)+switch_size./2,params(i,2)+switch_size./2]);
+                                    Screen('DrawDots', displayInfo.window, xy, 5, [1 0 0],[],1);
                                     Screen('DrawLine', displayInfo.window, bar_color, displayInfo.xCenter - percent_score * scorebar_length,displayInfo.yCenter-200, displayInfo.xCenter + percent_score * scorebar_length,displayInfo.yCenter-200,5);
                                     DrawFormattedText(displayInfo.window,['Miss :('],'center',displayInfo.yCenter-220, displayInfo.whiteVal);
-                                    % DrawFormattedText(displayInfo.window,[num2str(length(trials)-sum(trials)+1) '/' num2str(length(seeds)) ' finished'],'center','center', displayInfo.whiteVal);
+                                    DrawFormattedText(displayInfo.window,[num2str(length(trials)-sum(trials)+1) '/' num2str(length(seeds)) ' finished'],'center','center', displayInfo.whiteVal);
                                     Screen('Flip', displayInfo.window);
                                     score = percent_score * 10 * hit;
                                 end
@@ -325,9 +318,12 @@ for current_block = 1:block_n % j代表当前是第几个block
     end
     data = [data;params];
     save(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) 'c_' date,'_rawtotal.mat'],'data');
-
-    traXtotal = [traXtotal;trax];
-    traYtotal = [traYtotal;tray];
+    xTrajTelomere = NaN(size(trax,1),size(traXtotal,2));
+    xTrajTelomere(1:size(trax,1),1:size(trax,2)) = trax;
+    traXtotal = [traXtotal;xTrajTelomere];
+    yTrajTelomere = NaN(size(tray,1),size(traYtotal,2));
+    yTrajTelomere(1:size(tray,1),1:size(tray,2)) = tray;
+    traYtotal = [traYtotal;yTrajTelomere];
     save(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) 'c_' date,'_traXtotal.mat'],'traXtotal')
     save(['data_onlineConf\' subj '\' subj '_' expName '_S' num2str(session) 'c_' date,'_traYtotal.mat'],'traYtotal')
     while true
