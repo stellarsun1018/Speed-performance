@@ -2,10 +2,10 @@ clear all
 Screen('Preference', 'SkipSyncTests', 1); 
 cd('C:\Users\labadmin\Documents\Qingjie-GitHub\Speed-performance\Speed-performance\Speed-performance');
 
-subj = 'pilot';  
+subj = 'ZL';  
 dateTime = clock;                % get time for seed             
 rng(sum(100*dateTime) );      % 也就是给每组实验/数据dataset 编一个编码，确保这组实验的可track
-expName = 'practice_traj';
+expName = 'sptatialTemporalCostFunc';
 session = 01;
 redoCalib = 0;
 
@@ -50,7 +50,7 @@ UniRandRadius = 50; % 单位 pixels，随机扰动范围
 edgesize = 50;
 hitrates = [0.3];
  
-rep = 12; % repeat 10 times of 3 (kind of dist)* 2(directions)  
+rep = 25; % repeat 10 times of 3 (kind of dist)* 2(directions)  
 
 scorebar_length = 200;
 
@@ -204,18 +204,18 @@ for current_block = 1:block_n % j代表当前是第几个block
                 if frame <= framerate * (story(3)+2)
                     Screen('DrawDots', displayInfo.window, startpos, start_size, [1 1 1] * displayInfo.whiteVal,[],1); %Starting point
                     if frame >= framerate * story(1)
-                        percent_score = max(1-((frame ./ framerate)-story(1)) / lifespan(current_block),0);
+                        percent_time_remain = max(1-((frame ./ framerate)-story(1)) / lifespan(current_block),0);
                     else 
-                        percent_score = 1;
+                        percent_time_remain = 1;
                     end
-                        dot_size = max(min(percent_score * max_dot_size, max_dot_size),1); % limit the dot size
+                        dot_size = max(min(percent_time_remain * max_dot_size, max_dot_size),1); % limit the dot size
                         Screen('DrawDots', displayInfo.window, params(i,1:2), dot_size, [0 0 1] * displayInfo.whiteVal, [], 1);
                             % draw center safety dot (black)
                         Screen('DrawDots', displayInfo.window, params(i,1:2), 7, [0 0 0], [], 1);
 
                         %Screen('DrawDots', displayInfo.window, params(i,1:2), 2 * percent_score * scorebar_length, [0 0 1] * displayInfo.whiteVal, [], 1);
-                        Screen('DrawLine', displayInfo.window, [1 1 1] * displayInfo.whiteVal, displayInfo.xCenter - percent_score * scorebar_length,displayInfo.yCenter-200, displayInfo.xCenter + percent_score * scorebar_length,displayInfo.yCenter-200,5);
-                        DrawFormattedText(displayInfo.window,['Score = ' num2str(percent_score * 10)],'center',displayInfo.yCenter-220, displayInfo.whiteVal);
+                        % Screen('DrawLine', displayInfo.window, [1 1 1] * displayInfo.whiteVal, displayInfo.xCenter - percent_time_remain * scorebar_length,displayInfo.yCenter-200, displayInfo.xCenter + percent_time_remain * scorebar_length,displayInfo.yCenter-200,5);
+                        % DrawFormattedText(displayInfo.window,['Time remain = ' num2str(percent_time_remain * 100) '%'],'center',displayInfo.yCenter-220, displayInfo.whiteVal);
                     
                     Screen('Flip', displayInfo.window);
                     
@@ -248,8 +248,8 @@ for current_block = 1:block_n % j代表当前是第几个block
                             onset_recorded = 1;
                         end
                         [keyIsDown,~,keyCode] = KbCheck;
-                        TarUB = params(i,1)- percent_score * scorebar_length;
-                        TarLB = params(i,1)+ percent_score * scorebar_length;
+                        TarUB = params(i,1)- percent_time_remain * scorebar_length;
+                        TarLB = params(i,1)+ percent_time_remain * scorebar_length;
                         if (locdiff <= speedthreshold/framerate && ~mode) || (buttons(1) && mode)
                             if norm(xy - startpos) < randdists(i)/2
                                 DrawFormattedText(displayInfo.window,'Not Even Close :(','center','center', displayInfo.whiteVal);
@@ -276,15 +276,17 @@ for current_block = 1:block_n % j代表当前是第几个block
 
                                 if hit 
                                     bar_color = [1 1 0] * displayInfo.whiteVal;
-%                                         percent_score = max(1-(((frame+k) ./ framerate)-story(1)) / lifespan(current_block),0);
-                                        Screen('DrawDots', displayInfo.window, params(i,1:2), dot_size, [0 0 1] * displayInfo.whiteVal, [], 1);
-                                        Screen('DrawDots', displayInfo.window, params(i,1:2), 7, [0 0 0], [], 1);  % 黑色中心点
-                                        Screen('DrawDots', displayInfo.window, xy, 5, [1 0 0] * displayInfo.whiteVal,[],1);
-                                        Screen('DrawLine', displayInfo.window, bar_color, displayInfo.xCenter - percent_score * scorebar_length,displayInfo.yCenter-200, displayInfo.xCenter + percent_score * scorebar_length,displayInfo.yCenter-200,5);
-                                        DrawFormattedText(displayInfo.window,['Score = ' num2str(percent_score * 10)],'center',displayInfo.yCenter-220, displayInfo.whiteVal);
-                                        % DrawFormattedText(displayInfo.window,[num2str(length(trials)-sum(trials)) '/' num2str(length(distances)) ' finished'],'center','center', displayInfo.whiteVal);
-                                        Screen('Flip', displayInfo.window);
-                                    score = percent_score * 10 * hit;
+                                    score = 100*(1 - norm(xy - params(i,1:2))/max_dot_size);
+                                    % percent_score = max(1-(((frame+k) ./ framerate)-story(1)) / lifespan(current_block),0);
+                                    Screen('DrawDots', displayInfo.window, params(i,1:2), dot_size, [0 0 1] * displayInfo.whiteVal, [], 1);
+                                    Screen('DrawDots', displayInfo.window, params(i,1:2), 7, [0 0 0], [], 1);  % 黑色中心点
+                                    Screen('DrawDots', displayInfo.window, xy, 5, [1 0 0] * displayInfo.whiteVal,[],1);
+                                    % Screen('DrawLine', displayInfo.window, bar_color, displayInfo.xCenter - percent_time_remain * scorebar_length,displayInfo.yCenter-200, displayInfo.xCenter + percent_time_remain * scorebar_length,displayInfo.yCenter-200,5);
+                                    % DrawFormattedText(displayInfo.window,['Time remain = ' num2str(percent_time_remain * 100) '%'],'center',displayInfo.yCenter-220, displayInfo.whiteVal);
+                                    DrawFormattedText(displayInfo.window,['Score = ' num2str(round(score)) '%'],'center',displayInfo.yCenter-220, displayInfo.whiteVal);
+                                    % DrawFormattedText(displayInfo.window,[num2str(length(trials)-sum(trials)) '/' num2str(length(distances)) ' finished'],'center','center', displayInfo.whiteVal);
+                                    Screen('Flip', displayInfo.window);
+                                    score = percent_time_remain * 10 * hit;
                                 else
 %                                     dot_size = tSize;
                                     Screen('DrawDots', displayInfo.window, params(i,1:2), dot_size, [0 0 1] * displayInfo.whiteVal, [], 1);
@@ -292,11 +294,11 @@ for current_block = 1:block_n % j代表当前是第几个block
 %                                     Screen('DrawDots',displayInfo.window, params(i,1:2), tSize,[0 1 0] * displayInfo.whiteVal,[],1);
 %                                     Screen('FrameOval',displayInfo.window, [1 1 0] * displayInfo.whiteVal, [params(i,1)-switch_size./2,params(i,2)-switch_size./2,params(i,1)+switch_size./2,params(i,2)+switch_size./2]);
                                     Screen('DrawDots', displayInfo.window, xy, 5, [1 0 0] * displayInfo.whiteVal,[],1);
-                                    Screen('DrawLine', displayInfo.window, bar_color, displayInfo.xCenter - percent_score * scorebar_length,displayInfo.yCenter-200, displayInfo.xCenter + percent_score * scorebar_length,displayInfo.yCenter-200,5);
+                                    % Screen('DrawLine', displayInfo.window, bar_color, displayInfo.xCenter - percent_time_remain * scorebar_length,displayInfo.yCenter-200, displayInfo.xCenter + percent_time_remain * scorebar_length,displayInfo.yCenter-200,5);
                                     DrawFormattedText(displayInfo.window,['Miss :('],'center',displayInfo.yCenter-220, displayInfo.whiteVal);
                                     % DrawFormattedText(displayInfo.window,[num2str(length(trials)-sum(trials)+1) '/' num2str(length(seeds)) ' finished'],'center','center', displayInfo.whiteVal);
                                     Screen('Flip', displayInfo.window);
-                                    score = percent_score * 10 * hit;
+                                    score = percent_time_remain * 10 * hit;
                                 end
                                 rest_of_trial = story(3) - end_t;
                                 pause(rest_of_trial);
