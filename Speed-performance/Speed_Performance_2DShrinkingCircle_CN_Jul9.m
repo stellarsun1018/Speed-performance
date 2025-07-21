@@ -2,12 +2,17 @@ clear all
 Screen('Preference', 'SkipSyncTests', 1); 
 cd('C:\Users\labadmin\Documents\Qingjie-GitHub\Speed-performance\Speed-performance\Speed-performance');
 
-subj = 'ZL';  
+subj = 'RC';  
 dateTime = clock;                % get time for seed             
 rng(sum(100*dateTime) );      % 也就是给每组实验/数据dataset 编一个编码，确保这组实验的可track
 expName = 'sptatialTemporalCostFunc';
-session = 01;
-redoCalib = 0;
+session = 2;
+redoCalib = 0;p
+
+outputDir = ['data_onlineConf\' subj];
+if ~exist(outputDir, 'dir')
+    mkdir(outputDir);
+end
 
 [displayInfo] = startExp(subj,datetime,rng);
 [displayInfo] = screenVisuals(displayInfo);
@@ -50,7 +55,7 @@ UniRandRadius = 50; % 单位 pixels，随机扰动范围
 edgesize = 50;
 hitrates = [0.3];
  
-rep = 25; % repeat 10 times of 3 (kind of dist)* 2(directions)  
+rep = 40; % repeat 10 times of 3 (kind of dist)* 2(directions)  
 
 scorebar_length = 200;
 
