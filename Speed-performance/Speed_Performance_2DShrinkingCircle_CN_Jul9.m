@@ -51,7 +51,7 @@ bottomBuff = [0 displayInfo.screenYpixels-displayInfo.screenAdj/2 displayInfo.sc
 %% Task Parameters
 
 dists_n = 3; % 3 kind of disciances
-UniRandRadius = 50; % 单位 pixels，随机扰动范围
+UniRandRadius = 50; % 单位 pixels，随机扰动范围，在之后target距离扰动时会用到
 edgesize = 50;
 hitrates = [0.3];
  
@@ -66,7 +66,7 @@ target_sizes = target_sizes';
 target_sizes = target_sizes(:)'; 
 switch_scale = 1.5; % 
 
-all_distances = exp(linspace(log(231),log(693),5));
+all_distances = exp(linspace(log(231),log(693),5)); % 等比 代替 等差 % 单位是pixel
 lifespan = [0.6,0.6*3^(0.25),0.6*3^(0.5)]; %[1.0,0.6,0.8,0.4]; %[1.1,0.9,1.0,0.8,0.6,0.7] 设定各blocks中target的不同时长  %lifespan控制了受试者实际可用的、逐渐减少的目标"可见e时间窗，这一时间越短，任务难度越高（因为受试者必须更快速地完成任务以取得更高分数）。
 block_n = length(lifespan); % 实验有4个blocks，每个block有10*3*2个trails
 %% Trial
@@ -147,7 +147,7 @@ for current_block = 1:block_n % j代表当前是第几个block
                     break
                 end
                 [x,y,buttons] = GetMouse(displayInfo.window2);
-                if rem(i,2)
+                if rem(i,2) % 有 或 没有 余数，判断左边开始还是右边开始
                     startpos = [displayInfo.windowRect(3)-edgesize,displayInfo.yCenter];
                     theta = -pi/12 + (pi/6) * rand(1); % 这个计算让 theta 在 [-pi/12, pi/12] 之间随机变化，表示目标的角度扰动：角度偏移 (范围：-15° 到 15°)
                     rho = randdists(i)-UniRandRadius + UniRandRadius * 2 * rand(1);
