@@ -89,8 +89,10 @@ while true
     if b(1)
         break
     end
-    if KbCheck
-        Screen('CloseAll')
+    [~,~,keyCode] = KbCheck;
+    if find(keyCode) == 27 % KbName(27) = 'ESCAPE'
+        Screen('CloseAll');
+        ShowCursor;
         break
     end
 end
