@@ -163,6 +163,7 @@ for current_block = 1:block_n % j代表当前是第几个block
                     params(i,1:2) = startpos + offset;
                 end
                 params(i,10) = randsizes(i);
+                params(i,3) = lifespan(current_block);
                 switch_size = switch_scale * params(i,10);
                 Screen('DrawDots', displayInfo.window, startpos, start_size, [1 1 1] * displayInfo.whiteVal,[],1);
                 [xy(1), xy(2)]  = transformPointsForward(tform,x,y);
@@ -309,7 +310,6 @@ for current_block = 1:block_n % j代表当前是第几个block
                                 end
                                 rest_of_trial = story(3) - end_t;
                                 pause(rest_of_trial);
-                                params(i,3) = 0;
                                 params(i,5) = end_t;
                                 params(i,6:7) = endpos;
                                 params(i,8:9) = startpos;
@@ -359,13 +359,17 @@ validTraX = traXtotal(index==true,:);
 validTraY = traYtotal(index==true,:);
 %%
 pixellength = 0.248;
+Affine2d =tform.T(1:2,1:2);
+[~,s,~] = svd(Affine2d);
+proj2tablet = 1./mean([s(1,1),s(2,2)]);  
+mmPerProjPx = proj2tablet .* pixellength;
 copy = valid;
 copy(:,[1,2]) = transformPointsInverse(tform,copy(:,[1,2]));
 copy(:,[8,9]) = transformPointsInverse(tform,copy(:,[8,9]));
 copy(:,10) = sqrt(sum((copy(:,1:2) - copy(:,8:9)).^2,2)) .* pixellength;
 copy(:,[11,12]) = [copy(:,1)*pixellength (1080 - copy(:,2))*pixellength];
 copy(:,[13,14]) = [copy(:,6)*pixellength (1080 - copy(:,7))*pixellength]; % 1080 = tablet pixel height
-copy(:,15) = valid(:,10) .* pixellength;
+copy(:,15) = valid(:,10) .* mmPerProjPx;
 copy(:,16) = copy(:,5) - copy(:,4);
 copy(:,17) = sqrt( (copy(:,13)-copy(:,11)).^2 + (copy(:,14)-copy(:,12)).^2 );
 copy(:,27) = 1:size(copy,1);
