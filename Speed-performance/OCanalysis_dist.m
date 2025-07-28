@@ -23,6 +23,8 @@
 % 30: maxSpeed
 % 31: target shrinking duration(second)
 % 32: target shrinking speed(mm/s)
+
+%%
 lifespan = [0.6,0.6*3^(0.25),0.6*3^(0.5)]; %[1.0,0.6,0.8,0.4]; %[1.1,0.9,1.0,0.8,0.6,0.7] 设定各blocks中target的不同时长  %lifespan控制了受试者实际可用的、逐渐减少的目标"可见e时间窗，这一时间越短，任务难度越高（因为受试者必须更快速地完成任务以取得更高分数）。
 for i = 1:3
     copy((1+(i-1)*240):(i*240),3) = lifespan(i);
@@ -170,6 +172,9 @@ figure;
 plot3(reach_distances, avg_speed, errors, 'o');
 hold on;
 
+xlim([0 max(reach_distances)]);
+ylim([0 max(avg_speed)]);
+
 % Generate grid for regression plane
 [dist_grid, speed_grid] = meshgrid(linspace(min(reach_distances), max(reach_distances), 20), ...
                                    linspace(min(avg_speed), max(avg_speed), 20));
@@ -193,6 +198,9 @@ hold off;
 figure;
 plot3(reach_distances, avg_speed, errors, 'o');
 hold on;
+
+xlim([0 max(reach_distances)]);
+ylim([0 max(avg_speed)]);
 
 % Generate grid for regression plane
 [dist_grid, speed_grid] = meshgrid(linspace(min(reach_distances), max(reach_distances), 50), ...
@@ -292,7 +300,7 @@ hold off;
 % grid on;
 % hold off;
 
-%%  Z axis: Gain error ~ reach distance + ave speed
+%%  Z axis: Gain error ~ reach distance + speed
 % Extract variables
 reach_distances = copy(:,21);
 avg_speed = copy(:,22);
@@ -314,6 +322,9 @@ figure;
 plot3(reach_distances, avg_speed, Reach_errors, 'o');
 hold on;
 
+xlim([0 max(reach_distances)]);
+ylim([0 max(avg_speed)]);
+
 % Generate grid for regression plane
 [dist_grid, speed_grid] = meshgrid(linspace(min(reach_distances), max(reach_distances), 20), ...
                                    linspace(min(avg_speed), max(avg_speed), 20));
@@ -330,11 +341,14 @@ title('Multivariate Linear Regression: Gain Error ~ Reach Distance + Speed');
 grid on;
 hold off;
 
-%%
+%% add Contours 加入等高线
 % 3D scatter plot of the original data
 figure;
 plot3(reach_distances, avg_speed, Reach_errors, 'o');
 hold on;
+
+xlim([0 max(reach_distances)]);
+ylim([0 max(avg_speed)]);
 
 % Generate grid for regression plane
 [dist_grid, speed_grid] = meshgrid(linspace(min(reach_distances), max(reach_distances), 50), ...
@@ -369,6 +383,9 @@ residuals1 = Reach_errors - errors_predicted;
 % 3D scatter plot of residuals
 figure;
 plot3(reach_distances, avg_speed, residuals1, 'ro');
+xlim([0 max(reach_distances)]);
+ylim([0 max(avg_speed)]);
+
 xlabel('Reach Distance (mm)');
 ylabel('Average Speed (mm/s)');
 zlabel('Residuals (mm)');
@@ -379,7 +396,7 @@ grid on;
 figure;
 qqplot(residuals1)
 
-%% Z axis: angle_error_in_degree ~ reach distance + ave speed
+%% Z axis: angle_error_in_degree (orthognal) ~ reach distance + speed
 
 % Extract variables
 reach_distances = copy(:,21);
@@ -399,8 +416,11 @@ fprintf('Average speed coefficient: %.4f\n', coeffs(3));
 
 % 3D scatter plot of the original data
 figure;
-plot3(reach_distances, avg_speed, Orth_errors, 'o');
+plot3(reach_distances, avg_speed, angle_error_in_degree, 'o');
 hold on;
+
+xlim([0 max(reach_distances)]);
+ylim([0 max(avg_speed)]);
 
 % Generate grid for regression plane
 [dist_grid, speed_grid] = meshgrid(linspace(min(reach_distances), max(reach_distances), 20), ...
@@ -413,16 +433,19 @@ error_fit = coeffs(1) + coeffs(2)*dist_grid + coeffs(3)*speed_grid;
 mesh(dist_grid, speed_grid, error_fit);
 xlabel('Reach Distance (mm)');
 ylabel('Average Speed (mm/s)');
-zlabel('Orthognal Error (mm)');
-title('Multivariate Linear Regression: Orth Error ~ Reach Distance + Speed');
+zlabel('Angle error (degree)');
+title('Multivariate Linear Regression: Angle error ~ Reach Distance + Speed');
 grid on;
 hold off;
 
 %%
 % 3D scatter plot of the original data
 figure;
-plot3(reach_distances, avg_speed, Orth_errors, 'o');
+plot3(reach_distances, avg_speed, angle_error_in_degree, 'o');
 hold on;
+
+xlim([0 max(reach_distances)]);
+ylim([0 max(avg_speed)]);
 
 % Generate grid for regression plane
 [dist_grid, speed_grid] = meshgrid(linspace(min(reach_distances), max(reach_distances), 50), ...
@@ -441,26 +464,28 @@ contour3(dist_grid, speed_grid, error_fit, 5, 'k', 'LineWidth', 1);
 % Labels and aesthetics
 xlabel('Reach Distance (mm)');
 ylabel('Average Speed (mm/s)');
-zlabel('Orthogonal Error (mm)');
-title('Multivariate Linear Regression: Orthogonal Error ~ Distance + Speed');
+zlabel('Angle Error (degree)');
+title('Multivariate Linear Regression: Angle Error ~ Distance + Speed');
 grid on;
 view(3);
 hold off;
-
 
 %% step 2: orthognal error residuals 
 errors_predicted = X * coeffs;
 
 % Calculate residuals
-residuals2 = Orth_errors - errors_predicted;
+residuals2 = angle_error_in_degree - errors_predicted;
 
 % 3D scatter plot of residuals
 figure;
 plot3(reach_distances, avg_speed, residuals2, 'ro');
+xlim([0 max(reach_distances)]);
+ylim([0 max(avg_speed)]);
+
 xlabel('Reach Distance (mm)');
 ylabel('Average Speed (mm/s)');
 zlabel('Residuals (mm)');
-title('Residuals of Multivariate Linear Regression: Orth Error ~ Distance + Speed');
+title('Residuals of Multivariate Linear Regression: Angle Error ~ Distance + Speed');
 grid on;
 
 %% qq plot
