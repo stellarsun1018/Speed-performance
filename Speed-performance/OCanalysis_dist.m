@@ -1,6 +1,6 @@
 % copy column contents:
 % 1,2: target x and y in wac pixels 
-% 3: switch time, NaN means no switch made
+% 3: life span by block
 % 4,5: the onset and end time of the reach
 % 6,7: endpoint x and y in wac pixels
 % 8,9: start position in wac pixels
@@ -23,6 +23,10 @@
 % 30: maxSpeed
 % 31: target shrinking duration(second)
 % 32: target shrinking speed(mm/s)
+lifespan = [0.6,0.6*3^(0.25),0.6*3^(0.5)]; %[1.0,0.6,0.8,0.4]; %[1.1,0.9,1.0,0.8,0.6,0.7] 设定各blocks中target的不同时长  %lifespan控制了受试者实际可用的、逐渐减少的目标"可见e时间窗，这一时间越短，任务难度越高（因为受试者必须更快速地完成任务以取得更高分数）。
+for i = 1:3
+    copy((1+(i-1)*240):(i*240),3) = lifespan(i);
+end
 %%
 % participant = 1;
 % if participant == 1
@@ -54,14 +58,15 @@ pixellength = 0.248;
 Affine2d =tform.T(1:2,1:2);
 [~,s,~] = svd(Affine2d);
 proj2tablet = 1./mean([s(1,1),s(2,2)]);  
-mmPerProjPx = proj2tablet .* pixellength; % mmPerProjPx是从projector-实际tablet上的mm 之倍数  % 每次calibration能得到新的该值
+mmPerProjPx = proj2tablet .* pixellength; % mmPerProjPx是从projector-实际tablet上的mm 之倍数  % 每次calibration能得到新的该值，每次每个人得到的target size都不一样
+
 copy = valid;
 copy(:,[1,2]) = transformPointsInverse(tform,copy(:,[1,2]));
 copy(:,[8,9]) = transformPointsInverse(tform,copy(:,[8,9]));
 copy(:,10) = sqrt(sum((copy(:,1:2) - copy(:,8:9)).^2,2)) .* pixellength;
 copy(:,[11,12]) = [copy(:,1)*pixellength (1080 - copy(:,2))*pixellength];
 copy(:,[13,14]) = [copy(:,6)*pixellength (1080 - copy(:,7))*pixellength]; % 1080 = tablet pixel height
-copy(:,15) = valid(:,10) .* pixellength;
+copy(:,15) = valid(:,10) .* mmPerProjPx;
 copy(:,16) = copy(:,5) - copy(:,4);
 copy(:,17) = sqrt( (copy(:,13)-copy(:,11)).^2 + (copy(:,14)-copy(:,12)).^2 );
 copy(:,27) = 1:size(copy,1);
@@ -99,9 +104,41 @@ copy(copy(:,27)>=61 & copy(:,27)<=120, 31) = 0.6;
 copy(copy(:,27)>=121 & copy(:,27)<=180,31) = 0.8;
 copy(copy(:,27)>=181 & copy(:,27)<=240,31) = 0.4;
 
-% 在copy中新增第31列：target shrinking speed (mm/s)
+% 在copy中新增第32列：target shrinking speed (mm/s)
 copy(:,32) = copy(:,15) ./ copy(:,31);
 
+%%  polar coordination 
+
+angle_error_in_radian = asin(copy(:,29) ./ copy(:,21));
+
+angle_error_in_degree = rad2deg(angle_error_in_radian);
+
+copy(:,33) = angle_error_in_radian
+copy(:,34) = angle_error_in_degree
+
+%%
+lim_scale = 1.2;
+figure()
+for i = 1:3
+    block_ind = zeros(size(copy,1),1);
+    block_ind((1+(i-1)*240):(i*240)) = 1;
+    subplot(1,3,i)
+
+    distances = copy(block_ind==1,10);
+    avg_speed = copy(block_ind==1,22);
+    x = linspace(unique(copy(block_ind==1,15)),lim_scale*max(copy(:,10)),2);
+    y = x ./ unique(copy(block_ind==1,3));
+    
+    plot(distances,avg_speed,'o');
+    hold on
+    plot(x,y,'--')
+    hold off
+    xlabel("Target Distance (mm)");
+    ylabel("Average Speed (mm/s)");
+    legend('Trial data','Minimum speed')
+    xlim([0,lim_scale * max(copy(:,10))]);
+    ylim([0,lim_scale * max(copy(:,22))]);
+end
 %% 3d dot plot + linear reg
 distances = copy(:,10);
 avg_speed = copy(:,22);
@@ -255,7 +292,6 @@ hold off;
 % grid on;
 % hold off;
 
-
 %%  Z axis: Gain error ~ reach distance + ave speed
 % Extract variables
 reach_distances = copy(:,21);
@@ -343,18 +379,18 @@ grid on;
 figure;
 qqplot(residuals1)
 
-%% Z axis: Orthognal direction error ~ reach distance + ave speed
+%% Z axis: angle_error_in_degree ~ reach distance + ave speed
 
 % Extract variables
 reach_distances = copy(:,21);
 avg_speed = copy(:,22);
-Orth_errors = copy(:,29);
+angle_error_in_degree = copy(:,34);
 
 % Prepare the design matrix (adding a column of ones for intercept)
 X = [ones(size(reach_distances)), reach_distances, avg_speed];
 
 % Perform multivariate linear regression
-coeffs = regress(Orth_errors, X);
+coeffs = regress(angle_error_in_degree, X);
 
 % Display regression coefficients
 fprintf('Intercept: %.4f\n', coeffs(1));
