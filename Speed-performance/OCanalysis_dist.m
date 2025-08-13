@@ -118,7 +118,8 @@ angle_error_in_degree = rad2deg(angle_error_in_radian);
 copy(:,33) = angle_error_in_radian
 copy(:,34) = angle_error_in_degree
 
-%%
+%% 3 blocks - conditions graphs
+
 lim_scale = 1.2;
 figure()
 for i = 1:3
@@ -133,14 +134,189 @@ for i = 1:3
     
     plot(distances,avg_speed,'o');
     hold on
-    plot(x,y,'--')
+
+% 原始 condition line: speed = distance / lifespan
+    plot(x,y,'--','Color',[0 0.4 0.8],'LineWidth',1.5); % 蓝色
+
+% 新增：半大小的 condition line（红色）
+    y_half = x ./ (0.5 * unique(copy(block_ind==1,3)));
+    plot(x, y_half, '--r','LineWidth',1.5); % 红色虚线
+
     hold off
     xlabel("Target Distance (mm)");
     ylabel("Average Speed (mm/s)");
-    legend('Trial data','Minimum speed')
+    legend('Trial data','Min speed (full target)', 'Min speed (half-size target)','Location','northwest')
     xlim([0,lim_scale * max(copy(:,10))]);
     ylim([0,lim_scale * max(copy(:,22))]);
+
+    % hold off
+    % xlabel("Target Distance (mm)");
+    % ylabel("Average Speed (mm/s)");
+    % legend('Trial data','Minimum speed')
+    % xlim([0,lim_scale * max(copy(:,10))]);
+    % ylim([0,lim_scale * max(copy(:,22))]);
 end
+
+
+%% Overlay all 3 blocks with regression lines through origin
+figure;
+colors = lines(3);  % 三种颜色
+
+% 初始化 legend 对象数组
+h_scatter = gobjects(3,1);
+h_line = gobjects(3,1);
+
+for i = 1:3
+    block_inds = (1+(i-1)*240):(i*240);
+    distances = copy(block_inds,10);
+    avg_speed = copy(block_inds,22);
+
+    % 画散点图，并保存 scatter 句柄
+    h_scatter(i) = scatter(distances, avg_speed, 20, colors(i,:), 'filled'); hold on;
+
+    % 原点回归：y = kx
+    k = distances \ avg_speed;
+    x_fit = linspace(min(distances), max(distances), 100);
+    y_fit = k * x_fit;
+
+    % 虚线拟合线，并保存句柄
+    h_line(i) = plot(x_fit, y_fit, '--', 'Color', colors(i,:), 'LineWidth', 2);
+
+    % 显示 slope
+    fprintf('Block %d: slope = %.2f, implied lifespan = %.2f sec\n', i, k, 1/k);
+end
+
+xlabel('Target Distance (mm)');
+ylabel('Average Speed (mm/s)');
+title('Distance vs Speed (3 Blocks with Origin-Fixed Regression)');
+
+% 用回归线句柄生成 legend（不是散点）
+legend(h_line, ...
+    {'Block 1 (slope)', 'Block 2 (slope)', 'Block 3 (slope)'}, ...
+    'Location', 'northwest');
+
+grid on;
+
+%%
+% Add red dashed lines for half-size threshold
+lifespans = [0.6, 0.6*3^(0.25), 0.6*3^(0.5)];
+for i = 1:3
+    half_time = lifespans(i) / 2;  % time to shrink to half
+    x_half = linspace(0, max(copy(:,10)), 100);
+    y_half = x_half ./ half_time;
+    plot(x_half, y_half, 'r--', 'LineWidth', 1.5);
+end
+
+%%  Duration histograms by block (overlapped) + disappearance time lines
+% copy(:,16) = duration(s); copy(:,3) = lifespan(s)（每个block恒定）
+
+assert(size(copy,1) >= 3*240, '预期每个block约240 trial，请确认数据尺寸。');
+
+trialsPerBlock = 240;
+blocks = 1:3;
+
+% 颜色（与要求一致：红/蓝/黄）
+blockColors = [1 0 0; 0 0.45 0.95; 1 0.9 0]; % red, blue, yellow
+
+% 收集各 block 的 duration
+Dur = cell(1,3);
+Tdisappear = nan(1,3);
+for i = blocks
+    r = (1+(i-1)*trialsPerBlock) : (i*trialsPerBlock);
+    r = r(r <= size(copy,1));      % 防越界
+    Dur{i} = copy(r,16);           % duration (s)
+    ls = unique(copy(r,3));        % lifespan(s) —— 目标消失时间
+    ls = ls(~isnan(ls));
+    if isempty(ls)
+        Tdisappear(i) = NaN;
+    else
+        % 若存在极少数异常，可用中位数稳健估计
+        Tdisappear(i) = median(ls);
+    end
+end
+
+% 统一 bin（避免直方图形状受bin不同影响）
+allDur = copy(:,16);
+allDur = allDur(isfinite(allDur));
+edges = linspace(prctile(allDur,1), prctile(allDur,99), 30);
+
+figure('Name','Duration Histograms by Block');
+hold on;
+hH = gobjects(1,3);
+hV = gobjects(1,3);
+for i = blocks
+    hH(i) = histogram(Dur{i}, edges, ...
+        'Normalization','pdf', ...
+        'FaceColor', blockColors(i,:), ...
+        'EdgeColor','none', ...
+        'FaceAlpha', 0.35);
+    if isfinite(Tdisappear(i))
+        hV(i) = xline(Tdisappear(i), '--', ...
+            'Color', blockColors(i,:), 'LineWidth', 2);
+    end
+end
+xlabel('Reach Duration T (s)');
+ylabel('Density');
+title('Overlapped Duration Histograms with Disappearance Times');
+grid on;
+
+% 图例：区分直方图与其对应的消失时间
+lgd = legend( ...
+    [hH(1) hH(2) hH(3) hV(1) hV(2) hV(3)], ...
+    {'Block 1 durations','Block 2 durations','Block 3 durations', ...
+     sprintf('Block 1 disappear @ %.2fs', Tdisappear(1)), ...
+     sprintf('Block 2 disappear @ %.2fs', Tdisappear(2)), ...
+     sprintf('Block 3 disappear @ %.2fs', Tdisappear(3))}, ...
+    'Location','northwest');
+lgd.Box = 'off';
+hold off;
+
+%% Compare mean durations across blocks (bar + errorbars) + print stats
+
+meansT = nan(1,3);
+stdT   = nan(1,3);
+nT     = nan(1,3);
+semT   = nan(1,3);
+
+for i = blocks
+    di = Dur{i};
+    di = di(isfinite(di));
+    meansT(i) = mean(di);
+    stdT(i)   = std(di);
+    nT(i)     = numel(di);
+    semT(i)   = stdT(i)/sqrt(max(nT(i),1));
+end
+
+% 柱状图 （+ SEM 误差条）
+figure('Name','Mean Duration by Block');
+bh = bar(1:3, meansT, 'FaceColor','flat'); 
+for i = blocks
+    bh.CData(i,:) = blockColors(i,:);
+end
+% hold on;
+% errorbar(1:3, meansT, semT, 'k', 'LineStyle','none', 'LineWidth',1.5, 'CapSize',8);
+
+% 在柱子上方写均值
+for i = 1:3
+    text(i, meansT(i) + 0.005, sprintf('%.3f', meansT(i)), ...
+        'HorizontalAlignment','center', 'FontSize', 12, 'FontWeight','bold');
+end
+
+xticks(1:3); xticklabels({'Block 1','Block 2','Block 3'});
+ylabel('Mean Duration (s)');
+title('Average Reach Duration per Block');
+grid on; box off;
+
+% 控制台打印统计
+fprintf('\n=== Duration Summary by Block ===\n');
+for i = blocks
+    fprintf('Block %d: N=%d, Mean=%.4f s, SD=%.4f s, SEM=%.4f s, Disappear=%.4f s\n', ...
+        i, nT(i), meansT(i), stdT(i), semT(i), Tdisappear(i));
+end
+
+
+%%
+
 %% 3d dot plot + linear reg
 distances = copy(:,10);
 avg_speed = copy(:,22);

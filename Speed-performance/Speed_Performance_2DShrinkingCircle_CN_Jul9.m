@@ -55,7 +55,7 @@ UniRandRadius = 50; % 单位 pixels，随机扰动范围，在之后target距离
 edgesize = 50;
 hitrates = [0.3];
  
-rep = 40; % repeat 10 times of 3 (kind of dist)* 2(directions)  
+rep = 40; % repeat 40 times of 3 (kind of dist)* 2(directions)  
 
 scorebar_length = 200;
 
