@@ -1,6 +1,6 @@
 % copy column contents:
 % 1,2: target x and y in wac pixels 
-% 3: life span by block
+% 3: life span by block / target shrinking longest duration(second)
 % 4,5: the onset and end time of the reach
 % 6,7: endpoint x and y in wac pixels
 % 8,9: start position in wac pixels
@@ -21,8 +21,7 @@
 % 28: hit or not
 % 29: error orthogonal to the reach direction (vector rejection) in mm
 % 30: maxSpeed
-% 31: target shrinking duration(second)
-% 32: target shrinking speed(mm/s)
+% 31: target shrinking speed(mm/s)
 
 
 %%
@@ -96,7 +95,7 @@ for i = 1:3
     copy((1+(i-1)*240):(i*240),3) = lifespan(i);
 end
 
-copy(:,31) = copy(:,15) ./ copy(:,3);
+copy(:,31) = copy(:,15) ./ copy(:,3); % 31: target shrinking speed(mm/s)
 
 %%
 distances = copy(:,10); 
@@ -108,13 +107,13 @@ b0 = [0.5,0.01,1];
 bUB = [1,10,10]; % [b(1) = Index of Performance IP, b(2) tuning factor
 bLB = [eps,eps,1];
 fun_gain = @(b) -sum(log(normpdf(gain_error,0,2.^(log2(distances * 2) - b(1) ./ durations) .* b(2) + b(3))));
-b_gain = bads(fun_gain,b0,bLB,bUB);
+b_gain = bads(fun_gain,b0,bLB,bUB); % gain方向上的系数
 
 fun_dir = @(b) -sum(log(normpdf(dir_error,0,2.^(log2(distances * 2) - b(1) ./ durations) .* b(2) + b(3))));
-b_dir = bads(fun_dir,b0,bLB,bUB);
+b_dir = bads(fun_dir,b0,bLB,bUB);  % dir方向上的系数
 %%
-gain_mean = zeros(size(distances));
-gain_std = 2.^(log2(distances * 2) - b_gain(1) ./ durations) .* b_gain(2) + b_gain(3);
+gain_mean = zeros(size(distances)); % if no bias
+gain_std = 2.^(log2(distances * 2) - b_gain(1) ./ durations) .* b_gain(2) + b_gain(3); % W * b2 = sigma
 dir_mean = zeros(size(distances));
 dir_std = 2.^(log2(distances * 2) - b_dir(1) ./ durations) .* b_dir(2) + b_dir(3);
 % figure;
@@ -124,7 +123,7 @@ dir_std = 2.^(log2(distances * 2) - b_dir(1) ./ durations) .* b_dir(2) + b_dir(3
 % zlabel('Gain Sigma')
 %%
 figure;
-plot3(distances,durations,gain_std,'o')
+plot3(distances,durations,gain_std,'o') % endpoint error 的sigma 
 ylabel('Duration')
 xlabel('Distances')
 zlabel('Gain Std')
