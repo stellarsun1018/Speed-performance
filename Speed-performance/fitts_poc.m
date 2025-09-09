@@ -45,12 +45,7 @@ end
 valid = data(index==true,:);
 validTraX = traXtotal(index==true,:);
 validTraY = traYtotal(index==true,:);
-%%
-% addpath('/Users/stellar/Desktop/Landy lab/Speed-Accuracy-2D Shrinking Circle/bads-master'); % 更改为你解压的路径
-% savepath; % 保存路径，下次启动 MATLAB 自动加载
-% which bads
 
-%%
 pixellength = 0.248;
 Affine2d =tform.T(1:2,1:2);
 [~,s,~] = svd(Affine2d);
@@ -103,40 +98,159 @@ gain_error = copy(:,23); % biased/signed
 dir_error = copy(:,29); % biased/signed
 durations = copy(:,16);
 speeds = copy(:,22);
-b0 = [0.5,0.01,1]; 
-bUB = [1,10,10]; % [b(1) = Index of Performance IP, b(2) tuning factor
-bLB = [eps,eps,1];
-fun_gain = @(b) -sum(log(normpdf(gain_error,0,2.^(log2(distances * 2) - b(1) ./ durations) .* b(2) + b(3))));
-b_gain = bads(fun_gain,b0,bLB,bUB); % gain方向上的系数
+end_size = copy(:,15) .* durations ./ copy(:,3);
 
-fun_dir = @(b) -sum(log(normpdf(dir_error,0,2.^(log2(distances * 2) - b(1) ./ durations) .* b(2) + b(3))));
-b_dir = bads(fun_dir,b0,bLB,bUB);  % dir方向上的系数
+
+thetaUB = [10,2]; % [theta(1) = index of performance IP, theta(2) tuning factor, theta(3) baseline
+thetaLB = [-10,eps];
+theta0 = rand .* (thetaUB + thetaLB)./2;
+
+fun_std = @(theta,dist,dur) 2.^(log2(dist * 2) - (theta(1) .* dur)) .* theta(2) + 2;
+fun_fit_std = @(theta) fun_std(theta,distances,durations);
+fun_base = @(theta,error) -sum(log(normpdf(error,0,fun_fit_std(theta))));
+
+fun_gain = @(theta) fun_base(theta,gain_error);
+theta_gain = bads(fun_gain,theta0,thetaLB,thetaUB);
+
+fun_dir = @(theta) fun_base(theta,dir_error);
+theta_dir = bads(fun_dir,theta0,thetaLB,thetaUB);
+
 %%
-gain_mean = zeros(size(distances)); % if no bias
-gain_std = 2.^(log2(distances * 2) - b_gain(1) ./ durations) .* b_gain(2) + b_gain(3); % W * b2 = sigma
+step_n = 100;
+smooth_dist = linspace(min(distances),max(distances),step_n);
+smooth_dur = linspace(min(durations),max(durations),step_n);
+zoom_dist = (max(distances) - min(distances)) / step_n;
+zoom_dur = (max(durations) - min(durations)) / step_n;
+
+[x,y] = meshgrid(smooth_dist,smooth_dur);
+smooth_gain_std = fun_std(theta_gain,x,y);
+smooth_dir_std = fun_std(theta_dir,x,y);
+
+subplot(1,2,1)
+imagesc(smooth_gain_std)
+hold on
+contour(1:step_n, 1:step_n, smooth_gain_std, 'LineColor', 'k', 'LineWidth', 1);
+plot(distances./zoom_dist, durations./zoom_dur,'ko')
+hold off
+xlabel('Distance')
+ylabel('Duration')
+title('Gain Sigma')
+xticks(linspace(1, step_n, 5));
+xticklabels(round(linspace(min(smooth_dist), max(smooth_dist), 5), 2));
+yticks(linspace(1, step_n, 5));
+yticklabels(round(linspace(min(smooth_dur), max(smooth_dur), 5), 2));
+colorbar
+axis xy
+
+subplot(1,2,2)
+imagesc(smooth_dir_std)
+hold on
+contour(1:step_n, 1:step_n, smooth_dir_std, 'LineColor', 'k', 'LineWidth', 1);
+plot(distances./zoom_dist, durations./zoom_dur,'ko')
+hold off
+xlabel('Distance')
+ylabel('Duration')
+title('Direction Sigma')
+xticks(linspace(1, step_n, 5));
+xticklabels(round(linspace(min(smooth_dist), max(smooth_dist), 5), 2));
+yticks(linspace(1, step_n, 5));
+yticklabels(round(linspace(min(smooth_dur), max(smooth_dur), 5), 2));
+colorbar
+axis xy
+
+%%
+smooth_gain_width = smooth_gain_std ./ theta_gain(2);
+smooth_dir_width = smooth_dir_std ./ theta_dir(2);
+
+subplot(1,2,1)
+imagesc(smooth_gain_width)
+hold on
+contour(1:step_n, 1:step_n, smooth_gain_width, 'LineColor', 'k', 'LineWidth', 1);
+hold off
+xlabel('Distance')
+ylabel('Duration')
+title('Gain Width')
+xticks(linspace(1, step_n, 5));
+xticklabels(round(linspace(min(smooth_dist), max(smooth_dist), 5), 2));
+yticks(linspace(1, step_n, 5));
+yticklabels(round(linspace(min(smooth_dur), max(smooth_dur), 5), 2));
+colorbar
+axis xy
+
+subplot(1,2,2)
+imagesc(smooth_dir_width)
+hold on
+contour(1:step_n, 1:step_n, smooth_dir_width, 'LineColor', 'k', 'LineWidth', 1);
+hold off
+xlabel('Distance')
+ylabel('Duration')
+title('Direction Width')
+xticks(linspace(1, step_n, 5));
+xticklabels(round(linspace(min(smooth_dist), max(smooth_dist), 5), 2));
+yticks(linspace(1, step_n, 5));
+yticklabels(round(linspace(min(smooth_dur), max(smooth_dur), 5), 2));
+colorbar
+axis xy
+%%
+gain_mean = zeros(size(distances));
+gain_std = fun_fit_std(theta_gain);
 dir_mean = zeros(size(distances));
-dir_std = 2.^(log2(distances * 2) - b_dir(1) ./ durations) .* b_dir(2) + b_dir(3);
-% figure;
-% plot3(distances,durations,gain_std,'o')
-% xlabel('Distance')
-% ylabel('Duration')
-% zlabel('Gain Sigma')
-%%
+dir_std = fun_fit_std(theta_dir);
+
 figure;
-plot3(distances,durations,gain_std,'o') % endpoint error 的sigma 
+subplot(1,2,1)
+plot3(distances,durations,gain_std,'o')
 ylabel('Duration')
 xlabel('Distances')
 zlabel('Gain Std')
+title('Gain')
+grid on
 
-figure;
+subplot(1,2,2)
 plot3(distances,durations,dir_std,'o')
 ylabel('Duration')
 xlabel('Distances')
 zlabel('Dir Std')
+title('Direction')
+grid on
+
 %%
-end_size = copy(:,15) .* durations ./ copy(:,3);
+example_sizes = linspace(min(end_size),max(end_size),5);
+accuracy = linspace(0.5,0.8,5);
+
+figure;
+hold on
+for i = 1:length(example_sizes)
+smooth_mt = log2(2 .* smooth_dist ./ example_sizes(i)) ./ 10;
+plot(smooth_dist,smooth_mt,'k--', LineWidth=2)
+
+std_i = example_sizes(1) / (sqrt(2) * erfinv(accuracy(i)));
+width_i = ((std_i - theta_dir(3)) ./ theta_dir(2));
+dur_i = log2(2 .* smooth_dist ./ width_i) ./ theta_dir(1);
+plot(smooth_dist,dur_i,'r--', LineWidth=2)
+end 
+% plot(distances, durations, 'o')
+hold off
+grid on
+legend('Vary Sizes','Vary Accuracies')
+
+%%
+figure;
+hold on
+for i = 1:length(example_sizes)
+smooth_mt = log2(2 .* smooth_dist ./ example_sizes(i)) ./ theta_gain(1);
+std_i = example_sizes(1) / (sqrt(2) * erfinv(accuracy(i)));
+dur_i = log2(2 .* smooth_dist ./ ((std_i - theta_gain(3)) ./ theta_gain(2)) ) ./ theta_gain(1);
+plot(smooth_dist,smooth_mt,'k--', LineWidth=2)
+plot(smooth_dist,dur_i,'r--', LineWidth=2)
+end 
+% plot(distances, durations, 'o')
+hold off
+grid on
+legend('Vary Sizes','Vary Accuracies')
+%%
 accuracy = 0.7;
-half_width = gaussianBracketCenteredOnZero(gain_mean, gain_std, accuracy);
+half_width = gaussianBracketCenteredOnZero(gain_mean, smooth_gain_std, accuracy);
 
 figure;
 plot3(distances,durations,half_width,'o')
