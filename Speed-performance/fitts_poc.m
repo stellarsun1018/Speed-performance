@@ -1,6 +1,6 @@
 % copy column contents:
 % 1,2: target x and y in wac pixels 
-% 3: life span by block
+% 3: life span by block / target shrinking longest duration(second)
 % 4,5: the onset and end time of the reach
 % 6,7: endpoint x and y in wac pixels
 % 8,9: start position in wac pixels
@@ -21,8 +21,7 @@
 % 28: hit or not
 % 29: error orthogonal to the reach direction (vector rejection) in mm
 % 30: maxSpeed
-% 31: target shrinking duration(second)
-% 32: target shrinking speed(mm/s)
+% 31: target shrinking speed(mm/s)
 
 
 %%
@@ -91,7 +90,7 @@ for i = 1:3
     copy((1+(i-1)*240):(i*240),3) = lifespan(i);
 end
 
-copy(:,31) = copy(:,15) ./ copy(:,3);
+copy(:,31) = copy(:,15) ./ copy(:,3); % 31: target shrinking speed(mm/s)
 
 %%
 distances = copy(:,10); 
