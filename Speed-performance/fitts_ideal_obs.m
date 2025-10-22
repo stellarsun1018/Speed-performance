@@ -26,8 +26,8 @@
 
 %% Load Data 
 clear all
-participant = 'RC';
-session = 2;
+participant = 'JHL';
+session = 4;
 fname_preamble = sprintf('data_onlineConf/%s/%s_sptatialTemporalCostFunc_S%d*.mat',participant,participant,session);
 files = dir(fname_preamble);
 for k = 1:numel(files)
@@ -98,24 +98,61 @@ durations = copy(:,16);
 speeds = copy(:,22);
 end_size = copy(:,15) .* durations ./ copy(:,3);
 
+function Sigma = local_cov_pred(stdF, phi, dist, dur)
+    sig_gain = stdF(phi(1:2), dist, dur);      % σ_g in linear scale
+    sig_dir = stdF(phi(3:4), dist, dur);      % σ_d in linear scale
+    rho = phi(5);                        % static correlation ρ
 
-thetaUB = [10,2]; % [theta(1) = index of performance IP, theta(2) tuning factor, theta(3) baseline
-thetaLB = [-10,eps];
-theta0 = rand .* (thetaUB + thetaLB)./2;
+    if isscalar(sig_gain) && isscalar(sig_dir)
+        Sigma = [sig_gain.^2, rho*sig_gain*sig_dir; rho*sig_gain*sig_dir, sig_dir.^2];
+    else
+        n = numel(sig_gain);
+        Sigma = arrayfun(@(i) [sig_gain(i).^2, rho*sig_gain(i)*sig_dir(i); ...
+                               rho*sig_gain(i)*sig_dir(i), sig_dir(i).^2], ...
+                         (1:n)', 'UniformOutput', false);
+    end
+end
 
 fun_std = @(theta,dist,dur) 2.^(log2(dist * 2) - (theta(1) .* dur)) .* theta(2) + 2;
-fun_fit_std = @(theta) fun_std(theta,distances,durations);
-fun_base = @(theta,error) -sum(log(normpdf(error,0,fun_fit_std(theta))));
 
-fun_gain = @(theta) fun_base(theta,gain_error);
-theta_gain = bads(fun_gain,theta0,thetaLB,thetaUB);
+stdF = fun_std;  % alias: std in linear scale (Fitts-style)
 
-fun_dir = @(theta) fun_base(theta,dir_error);
-theta_dir = bads(fun_dir,theta0,thetaLB,thetaUB);
+% Parameters: [IP_g, k_g, IP_d, k_d, rho]
+phiUB = [ 10,  2,  10,  2,  0.95];
+phiLB = [-10, eps,-10, eps, -0.95];
 
+% Good initializer: reuse your 1D fits if available, else random-in-range
+phi0 = [rand*mean([phiUB(1),phiLB(1)]),  ... % IP_g
+            rand*mean([phiUB(2),phiLB(2)]),  ... % k_g
+            rand*mean([phiUB(3),phiLB(3)]),  ... % IP_d
+            rand*mean([phiUB(4),phiLB(4)]),  ... % k_d
+            0];                                  % rho
+
+
+% Negative log-likelihood for zero-mean 2D Gaussian with sample-wise Sigma
+fun_nll2d = @(phi) ...
+    (0.5*sum( ...
+        log( (stdF(phi(1:2),distances,durations).^2) .* ...
+             (stdF(phi(3:4),distances,durations).^2) .* (1 - phi(5).^2) ) + ...
+        (gain_error.^2) ./ (stdF(phi(1:2),distances,durations).^2) ...
+        - 2*phi(5) .* (gain_error.*dir_error) ./ ...
+          (stdF(phi(1:2),distances,durations).*stdF(phi(3:4),distances,durations)) + ...
+        (dir_error.^2) ./ (stdF(phi(3:4),distances,durations).^2) + ...
+        2*log(2*pi) ));
+
+% Fit all parameters jointly
+phi_hat = bads(fun_nll2d, phi0, phiLB, phiUB);
+
+% Covariance predictor:
+%  - If dist,dur are scalars: returns a 2x2 matrix.
+%  - If dist,dur are vectors (same length): returns a 1x1 cell array per i, each is 2x2.
+cov_pred = @(phi, dist, dur) ...
+    local_cov_pred(stdF, phi, dist, dur);
 
 %% Calculate Prediction Mapping from Fitted Parameters
 step_n = 100;
+rho = phi_hat(5);     % static correlation
+
 tar_size = unique(copy(:,15));
 smooth_dist = linspace(min(distances),max(distances),step_n);
 smooth_dur = linspace(min(durations),max(durations),step_n);
@@ -123,8 +160,8 @@ zoom_dist = (max(distances) - min(distances)) ./ step_n;
 zoom_dur = (max(durations) - min(durations))./ step_n;
 
 [x,y] = meshgrid(smooth_dist,smooth_dur);
-smooth_gain_std = fun_std(theta_gain,x,y);
-smooth_dir_std = fun_std(theta_dir,x,y);
+smooth_gain_std = fun_std(phi_hat(1:2),x,y);
+smooth_dir_std = fun_std(phi_hat(3:4),x,y);
 
 target_live_spans = sort(unique(copy(:,3)));
 life_span_keys = zeros(length(target_live_spans),size(copy,1));
@@ -142,11 +179,151 @@ end
 score_per_hit = @(term_size,tar_size,max_score) max_score .* max((term_size ./ tar_size),0);
 p_hit = @(term_size,sigma) normcdf(term_size, 0, sigma) - normcdf(-term_size, 0, sigma);
 exp_gain = @(term_size,sigma) p_hit(term_size,sigma) .* score_per_hit(term_size,tar_size,10);
+%%
+function P = local_p_hit2d_rect(a, sg, sd, rho)
+% Compute P(|G|<=a, |D|<=a) where [G;D] ~ N(0, Sigma), Sigma = [sg^2, rho*sg*sd; rho*sg*sd, sd^2]
+% Vectorized over matching arrays a, sg, sd. Tries mvncdf; if unavailable, falls back to MC.
+
+    % basic input checks / broadcasting guard
+    if ~isequal(size(a), size(sg)) || ~isequal(size(a), size(sd))
+        error('local_p_hit2d_rect: size mismatch among a, sg, sd.');
+    end
+
+    % Flatten to 1D for a simple loop, then reshape back
+    a_v  = a(:);
+    sg_v = sg(:);
+    sd_v = sd(:);
+    n    = numel(a_v);
+    P_v  = nan(n,1);
+
+    % Try exact bivariate normal CDF over rectangle with mvncdf
+    can_mvncdf = exist('mvncdf','file') == 2;
+
+    if can_mvncdf
+        for k = 1:n
+            ak  = a_v(k);
+            sgk = sg_v(k);
+            sdk = sd_v(k);
+            % Guard tiny/zero stds
+            sgk = max(sgk, realmin('double'));
+            sdk = max(sdk, realmin('double'));
+
+            % Lower/Upper bounds and Sigma
+            lo = [-ak, -ak];
+            hi = [ ak,  ak];
+            Sigma = [sgk^2, rho*sgk*sdk; rho*sgk*sdk, sdk^2];
+
+            % mvncdf returns the prob mass in the rectangle
+            P_v(k) = mvncdf(lo, hi, [0 0], Sigma);
+        end
+    else
+        % Monte Carlo fallback (fast-ish): independent base normals + correlate via Cholesky
+        % Note: MC per grid point can be costly; keep N moderate.
+        N = 1000;  % adjust if you want smoother estimates vs runtime
+        Z = randn(N, 2);  % reused base samples
+        for k = 1:n
+            ak  = a_v(k);
+            sgk = sg_v(k);
+            sdk = sd_v(k);
+            sgk = max(sgk, realmin('double'));
+            sdk = max(sdk, realmin('double'));
+            Sigma = [sgk^2, rho*sgk*sdk; rho*sgk*sdk, sdk^2];
+
+            % Cholesky (robustify with jitter if needed)
+            [L,p] = chol(Sigma, 'lower');
+            if p>0
+                % add tiny jitter if Sigma is borderline
+                jitter = 1e-12 * max(Sigma(1,1)+Sigma(2,2), 1);
+                [L,~] = chol(Sigma + jitter*eye(2), 'lower');
+            end
+            X = Z * L.';  % N x 2 samples ~ N(0,Sigma)
+            P_v(k) = mean( abs(X(:,1)) <= ak & abs(X(:,2)) <= ak );
+        end
+    end
+
+    P = reshape(P_v, size(a));
+end
+
+p_hit2d = @(a, sg, sd) local_p_hit2d_rect(a, sg, sd, rho);
+
+%%
+function EG = local_exp_score2d_mc(term_size, sg, sd, rho, tar_size, max_score, N)
+% Monte Carlo expected score per grid cell for the radial scoring rule.
+% Shapes: term_size, sg, sd are identical arrays (e.g., step_n x step_n).
+% tar_size can be scalar or same-sized array. EG has same shape as inputs.
+
+    if ~isequal(size(term_size), size(sg)) || ~isequal(size(term_size), size(sd))
+        error('local_exp_score2d_mc: size mismatch among term_size, sg, sd.');
+    end
+    if ~isscalar(tar_size) && ~isequal(size(tar_size), size(term_size))
+        error('local_exp_score2d_mc: tar_size must be scalar or match term_size size.');
+    end
+
+    % Vectorize over grid by flattening, then reshape back.
+    a_v  = term_size(:);
+    sg_v = max(sg(:),  realmin('double'));
+    sd_v = max(sd(:),  realmin('double'));
+    if isscalar(tar_size)
+        ts_v = repmat(tar_size, numel(a_v), 1);
+    else
+        ts_v = tar_size(:);
+    end
+    n  = numel(a_v);
+    EG_v = zeros(n,1);
+
+    % Reuse base standard-normal samples for variance reduction & speed.
+    if nargin < 7 || isempty(N), N = 2000; end
+    Z = randn(N, 2); % N x 2, iid N(0, I)
+
+    for k = 1:n
+        ak  = a_v(k);         % term_size (acceptance radius)
+        sgk = sg_v(k);
+        sdk = sd_v(k);
+        tsk = ts_v(k);
+
+        % Build Sigma and its Cholesky
+        Sigma = [sgk^2, rho*sgk*sdk; rho*sgk*sdk, sdk^2];
+        [L,p] = chol(Sigma, 'lower');
+        if p>0
+            jitter = 1e-12 * max(Sigma(1,1)+Sigma(2,2), 1);
+            [L,~] = chol(Sigma + jitter*eye(2), 'lower');
+        end
+
+        % Draw correlated samples ~ N(0, Sigma)
+        X = Z * L.';                 % N x 2
+        r = hypot(X(:,1), X(:,2));   % radial distance
+
+        % Radial, linearly decaying score inside acceptance radius
+        S = max_score * (1 - r./tsk);
+        S(r > ak) = 0;               % zero outside term_size
+        S(S < 0)  = 0;               % clamp if term_size < tar_size, etc.
+
+        EG_v(k) = mean(S);
+    end
+
+    EG = reshape(EG_v, size(term_size));
+end
+
+
+% MC expected score maps for each lifespan
+max_score = 10;
+exp_gain_maps = cell(length(target_live_spans),1);
+
+for i = 1:length(target_live_spans)
+    a  = squeeze(smooth_tar_size(i,:,:));   % term_size grid (dist x dur)
+    sg = smooth_gain_std;                   % σ_g grid
+    sd = smooth_dir_std;                    % σ_d grid
+
+    % tar_size can be a scalar 
+    exp_gain_maps{i} = local_exp_score2d_mc(a, sg, sd, rho, tar_size, max_score, 2000);
+end
+
+% exp_gain2d = @(a) local_exp_score2d_mc(a, smooth_gain_std, smooth_dir_std, rho, tar_size, max_score, 2000);
 
 %% Plot Specs
-column_num = 4;
+column_num = 5;
 plot_colorbar = 1;
-%% Gain Axis
+%% Plot
 figure
 for i = 1:length(target_live_spans)
     plot_idx = i-1;
@@ -174,10 +351,9 @@ for i = 1:length(target_live_spans)
     axis xy
 
     subplot(length(target_live_spans),column_num,plot_idx * column_num + 2)
-    current_sigma_map = smooth_gain_std;
-    imagesc(current_sigma_map)
+    imagesc(smooth_gain_std)
     hold on
-    contour(1:step_n, 1:step_n, current_sigma_map, 'LineColor', 'k', 'LineWidth', 1);
+    contour(1:step_n, 1:step_n, smooth_gain_std, 'LineColor', 'k', 'LineWidth', 1);
     plot((distances(life_span_keys(i,:) == 1)-min(distances))./zoom_dist, ...
         (durations(life_span_keys(i,:) == 1)-min(durations))./zoom_dur,'k.')
     hold off
@@ -196,83 +372,9 @@ for i = 1:length(target_live_spans)
     axis xy
 
     subplot(length(target_live_spans),column_num,plot_idx * column_num + 3)
-    current_phit_map = p_hit(current_size_map,current_sigma_map);
-    imagesc(current_phit_map)
+    imagesc(smooth_dir_std)
     hold on
-    contour(1:step_n, 1:step_n, current_phit_map, 'LineColor', 'k', 'LineWidth', 1);
-    plot((distances(life_span_keys(i,:) == 1)-min(distances))./zoom_dist, ...
-        (durations(life_span_keys(i,:) == 1)-min(durations))./zoom_dur,'k.')
-    hold off
-
-    if i == length(target_live_spans)
-        xlabel('Distance')
-    elseif i == 1
-        title('P(hit)')
-    end
-
-    xticks(linspace(1, step_n, 5));
-    xticklabels(round(linspace(min(smooth_dist), max(smooth_dist), 5), 0));
-    yticks(linspace(1, step_n, 5));
-    yticklabels(round(linspace(min(smooth_dur), max(smooth_dur), 5), 2));
-    if plot_colorbar; colorbar; end
-    axis xy
-
-    subplot(length(target_live_spans),column_num,plot_idx * column_num + 4)
-    current_egain_map = exp_gain(current_size_map,current_sigma_map);
-    imagesc(current_egain_map)
-    hold on
-    contour(1:step_n, 1:step_n, current_egain_map, 'LineColor', 'k', 'LineWidth', 1);
-    plot((distances(life_span_keys(i,:) == 1)-min(distances))./zoom_dist, ...
-        (durations(life_span_keys(i,:) == 1)-min(durations))./zoom_dur,'k.')
-    hold off
-
-    if i == length(target_live_spans)
-        xlabel('Distance')
-    elseif i == 1
-        title('Expected Gain')
-    end
-
-    xticks(linspace(1, step_n, 5));
-    xticklabels(round(linspace(min(smooth_dist), max(smooth_dist), 5), 0));
-    yticks(linspace(1, step_n, 5));
-    yticklabels(round(linspace(min(smooth_dur), max(smooth_dur), 5), 2));
-    if plot_colorbar; colorbar; end
-    axis xy
-
-end
-sgtitle(['Participant ' participant ' on Gain Axis'])
-%% Directional Axis
-figure
-for i = 1:length(target_live_spans)
-    plot_idx = i-1;
-    subplot(length(target_live_spans),column_num,plot_idx * column_num + 1)
-    current_size_map = squeeze(smooth_tar_size(i,:,:));
-    imagesc(current_size_map)
-    hold on
-    contour(1:step_n, 1:step_n, current_size_map, 'LineColor', 'k', 'LineWidth', 1);
-    plot((distances(life_span_keys(i,:) == 1)-min(distances))./zoom_dist, ...
-        (durations(life_span_keys(i,:) == 1)-min(durations))./zoom_dur,'k.')
-    hold off
-
-    if i == length(target_live_spans)
-        xlabel('Distance')
-    elseif i == 1
-        title('Target Size')
-    end
-
-    ylabel('Duration')
-    xticks(linspace(1, step_n, 5));
-    xticklabels(round(linspace(min(smooth_dist), max(smooth_dist), 5), 0));
-    yticks(linspace(1, step_n, 5));
-    yticklabels(round(linspace(min(smooth_dur), max(smooth_dur), 5), 2));
-    if plot_colorbar; colorbar; end
-    axis xy
-
-    subplot(length(target_live_spans),column_num,plot_idx * column_num + 2)
-    current_sigma_map = smooth_dir_std;
-    imagesc(current_sigma_map)
-    hold on
-    contour(1:step_n, 1:step_n, current_sigma_map, 'LineColor', 'k', 'LineWidth', 1);
+    contour(1:step_n, 1:step_n, smooth_dir_std, 'LineColor', 'k', 'LineWidth', 1);
     plot((distances(life_span_keys(i,:) == 1)-min(distances))./zoom_dist, ...
         (durations(life_span_keys(i,:) == 1)-min(durations))./zoom_dur,'k.')
     hold off
@@ -290,8 +392,8 @@ for i = 1:length(target_live_spans)
     if plot_colorbar; colorbar; end
     axis xy
 
-    subplot(length(target_live_spans),column_num,plot_idx * column_num + 3)
-    current_phit_map = p_hit(current_size_map,current_sigma_map);
+    subplot(length(target_live_spans),column_num,plot_idx * column_num + 4)
+    current_phit_map = p_hit2d(current_size_map,smooth_gain_std,smooth_dir_std);
     imagesc(current_phit_map)
     hold on
     contour(1:step_n, 1:step_n, current_phit_map, 'LineColor', 'k', 'LineWidth', 1);
@@ -312,8 +414,8 @@ for i = 1:length(target_live_spans)
     if plot_colorbar; colorbar; end
     axis xy
 
-    subplot(length(target_live_spans),column_num,plot_idx * column_num + 4)
-    current_egain_map = exp_gain(current_size_map,current_sigma_map);
+    subplot(length(target_live_spans),column_num,plot_idx * column_num + 5)
+    current_egain_map = exp_gain_maps{i};
     imagesc(current_egain_map)
     hold on
     contour(1:step_n, 1:step_n, current_egain_map, 'LineColor', 'k', 'LineWidth', 1);
@@ -326,11 +428,15 @@ for i = 1:length(target_live_spans)
     elseif i == 1
         title('Expected Gain')
     end
+
     xticks(linspace(1, step_n, 5));
     xticklabels(round(linspace(min(smooth_dist), max(smooth_dist), 5), 0));
     yticks(linspace(1, step_n, 5));
     yticklabels(round(linspace(min(smooth_dur), max(smooth_dur), 5), 2));
     if plot_colorbar; colorbar; end
     axis xy
+
 end
-sgtitle(['Participant ' participant ' on Directional Axis'])
+sgtitle(['Participant ' participant ' Ideal Observer'])
+
+saveas(gcf, fullfile('fitts', ['Participant_' participant '_Ideal_Observer.png']));
