@@ -127,11 +127,17 @@ for i = 1:3
 
     distances = copy(block_ind==1,10);
     avg_speed = copy(block_ind==1,22);
-    x = linspace(unique(copy(block_ind==1,15)),lim_scale*max(copy(:,10)),2);
+    x = linspace(0,lim_scale*max(copy(:,10)),2);
     y = x ./ unique(copy(block_ind==1,3));
     
     plot(distances,avg_speed,'o');
     hold on
+
+    mdl = fitlm(distances,avg_speed);
+    x_fit = linspace(0, lim_scale * max(copy(:,10)), 2);
+    y_fit = mdl.Coefficients.Estimate(1) + mdl.Coefficients.Estimate(2) .* x_fit;
+    plot(x_fit, y_fit, '--', 'Color', colors(i,:), 'LineWidth', 2);
+
 
 % 原始 condition line: speed = distance / lifespan
     plot(x,y,'--','Color',[0 0.4 0.8],'LineWidth',1.5); % 蓝色
@@ -143,7 +149,7 @@ for i = 1:3
     hold off
     xlabel("Target Distance (mm)");
     ylabel("Average Speed (mm/s)");
-    legend('Trial data','Min speed (full target)', 'Min speed (half-size target)','Location','northwest')
+    legend('Trial data','Linear Fit','Min speed (match disappear deadline)', 'Min speed (half-size target)','Location','northwest')
     xlim([0,lim_scale * max(copy(:,10))]);
     ylim([0,lim_scale * max(copy(:,22))]);
 
@@ -155,6 +161,47 @@ for i = 1:3
     % ylim([0,lim_scale * max(copy(:,22))]);
 end
 
+sgtitle("Arriving earlier for shorter distances and later for longer distances")
+
+%%
+%% 3 blocks - conditions graphs DURATION
+
+% lim_scale = 1.2;
+figure()
+for i = 1:3
+    block_ind = zeros(size(copy,1),1);
+    block_ind((1+(i-1)*240):(i*240)) = 1;
+    subplot(1,3,i)
+
+    distances = copy(block_ind==1,10);
+    duration = copy(block_ind==1,16);
+
+    plot(distances,duration,'o');
+    hold on
+
+    mdl = fitlm(distances,duration);
+    x_fit = linspace(0, lim_scale * max(copy(:,10)), 2);
+    y_fit = mdl.Coefficients.Estimate(1) + mdl.Coefficients.Estimate(2) .* x_fit;
+    plot(x_fit, y_fit, '--', 'Color', colors(i,:), 'LineWidth', 2);
+
+    yline(unique(copy(block_ind==1,3)).*0.5,'r--')
+    yline(unique(copy(block_ind==1,3)),'b--')
+    hold off
+    xlabel("Target Distance (mm)");
+    ylabel("Duration (s)");
+    legend('Trial data','Linear Fit','Disappear Deadline', 'Target Half Life','Location','northwest')
+    xlim([0,lim_scale * max(copy(:,10))]);
+    ylim([0,lim_scale * max(copy(:,16))]);
+
+    % hold off
+    % xlabel("Target Distance (mm)");
+    % ylabel("Average Speed (mm/s)");
+    % legend('Trial data','Minimum speed')
+    % xlim([0,lim_scale * max(copy(:,10))]);
+    % ylim([0,lim_scale * max(copy(:,22))]);
+end
+
+sgtitle("Arriving earlier for shorter distances and later for longer distances")
 
 %% Overlay all 3 blocks with regression lines through origin
 figure;
@@ -172,10 +219,10 @@ for i = 1:3
     % 画散点图，并保存 scatter 句柄
     h_scatter(i) = scatter(distances, avg_speed, 20, colors(i,:), 'filled'); hold on;
 
-    % 原点回归：y = kx
-    k = distances \ avg_speed;
-    x_fit = linspace(min(distances), max(distances), 100);
-    y_fit = k * x_fit;
+    % 线性回归：
+    mdl = fitlm(distances,avg_speed);
+    x_fit = linspace(0, max(distances), 100);
+    y_fit = mdl.Coefficients.Estimate(1) + mdl.Coefficients.Estimate(2) .* x_fit;
 
     % 虚线拟合线，并保存句柄
     h_line(i) = plot(x_fit, y_fit, '--', 'Color', colors(i,:), 'LineWidth', 2);
@@ -183,6 +230,9 @@ for i = 1:3
     % 显示 slope
     fprintf('Block %d: slope = %.2f, implied lifespan = %.2f sec\n', i, k, 1/k);
 end
+
+xlim([0,lim_scale * max(copy(:,10))]);
+ylim([0,lim_scale * max(copy(:,22))]);
 
 xlabel('Target Distance (mm)');
 ylabel('Average Speed (mm/s)');
