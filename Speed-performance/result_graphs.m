@@ -31,7 +31,7 @@ for i = 1:3
 end
 %%
 clear all
-participant = 'LC';
+participant = 'SX';
 session = 3;
 fname_preamble = sprintf('data_onlineConf/%s/%s_sptatialTemporalCostFunc_S%d*.mat',participant,participant,session);
 files = dir(fname_preamble);
@@ -186,7 +186,7 @@ end
 
 xlabel('Target Distance (mm)');
 ylabel('Average Speed (mm/s)');
-title('Distance vs Speed (3 Blocks with Origin-Fixed Regression)');
+title('Distance vs Speed (3 Blocks)');
 
 % 用回归线句柄生成 legend（不是散点）
 legend(h_line, ...
@@ -267,6 +267,89 @@ hold off;
 % transparent. also do t-tests against each pair (3! tests) and illustrate
 % significant pairs with horizontal brackets and star signs for p-value
 % error bar use SEM
+% meansT = nan(1,3);
+% stdT   = nan(1,3);
+% nT     = nan(1,3);
+% semT   = nan(1,3);
+% 
+% for i = blocks
+%     di = Dur{i};
+%     di = di(isfinite(di));
+%     meansT(i) = mean(di);
+%     stdT(i)   = std(di);
+%     nT(i)     = numel(di);
+%     semT(i)   = stdT(i)/sqrt(max(nT(i),1));
+% end
+% 
+% % 柱状图 （+ SEM 误差条）
+% figure('Name','Mean Duration by Block');
+% bh = bar(1:3, meansT, 'FaceColor','flat'); 
+% for i = blocks
+%     bh.CData(i,:) = blockColors(i,:);
+% end
+% % hold on;
+% % errorbar(1:3, meansT, semT, 'k', 'LineStyle','none', 'LineWidth',1.5, 'CapSize',8);
+% 
+% % 在柱子上方写均值
+% for i = 1:3
+%     text(i, meansT(i) + 0.005, sprintf('%.3f', meansT(i)), ...
+%         'HorizontalAlignment','center', 'FontSize', 12, 'FontWeight','bold');
+% end
+% 
+% xticks(1:3); xticklabels({'Block 1','Block 2','Block 3'});
+% ylabel('Mean Duration (s)');
+% title('Average Reach Duration per Block');
+% grid on; box off;
+% 
+% % 控制台打印统计
+% fprintf('\n=== Duration Summary by Block ===\n');
+% for i = blocks
+%     fprintf('Block %d: N=%d, Mean=%.4f s, SD=%.4f s, SEM=%.4f s, Disappear=%.4f s\n', ...
+%         i, nT(i), meansT(i), stdT(i), semT(i), Tdisappear(i));
+% end
+% 
+% %% 3D reg plane - Euclidean Error 
+% % Extract variables
+% reach_distances = copy(:,21);
+% avg_speed = copy(:,22);
+% errors = copy(:,17);
+% 
+% % Prepare the design matrix (adding a column of ones for intercept)
+% X = [ones(size(reach_distances)), reach_distances, avg_speed];
+% 
+% % Perform multivariate linear regression
+% coeffs = regress(errors, X);
+% 
+% % Display regression coefficients
+% fprintf('Intercept: %.4f\n', coeffs(1));
+% fprintf('Distance coefficient: %.4f\n', coeffs(2));
+% fprintf('Average speed coefficient: %.4f\n', coeffs(3));
+% 
+% % 3D scatter plot of the original data
+% figure;
+% plot3(reach_distances, avg_speed, errors, 'o');
+% hold on;
+% 
+% xlim([0 max(reach_distances)]);
+% ylim([0 max(avg_speed)]);
+% 
+% % Generate grid for regression plane
+% [dist_grid, speed_grid] = meshgrid(linspace(min(reach_distances), max(reach_distances), 20), ...
+%                                    linspace(min(avg_speed), max(avg_speed), 20));
+% 
+% % Predict errors using regression model
+% error_fit = coeffs(1) + coeffs(2)*dist_grid + coeffs(3)*speed_grid;
+% 
+% % Plot regression plane
+% mesh(dist_grid, speed_grid, error_fit);
+% xlabel('Reach Distance (mm)');
+% ylabel('Average Speed (mm/s)');
+% zlabel('Endpoint Euclidean Error (mm)');
+% title('Multivariate Linear Regression: Error ~ Reach Distance + Speed');
+% grid on;
+% hold off;
+
+% Compute mean, std, SEM
 meansT = nan(1,3);
 stdT   = nan(1,3);
 nT     = nan(1,3);
@@ -281,73 +364,78 @@ for i = blocks
     semT(i)   = stdT(i)/sqrt(max(nT(i),1));
 end
 
-% 柱状图 （+ SEM 误差条）
+%% === Bar Plot with SEM Error Bars ===
 figure('Name','Mean Duration by Block');
-bh = bar(1:3, meansT, 'FaceColor','flat'); 
+bh = bar(1:3, meansT, 'FaceColor','flat', 'FaceAlpha', 0.7); % 透明度0.7
+
 for i = blocks
     bh.CData(i,:) = blockColors(i,:);
 end
-% hold on;
-% errorbar(1:3, meansT, semT, 'k', 'LineStyle','none', 'LineWidth',1.5, 'CapSize',8);
+hold on;
 
-% 在柱子上方写均值
+% 添加误差条（SEM）
+er = errorbar(1:3, meansT, semT, 'k', 'LineStyle','none', ...
+    'LineWidth',1.5, 'CapSize',8, 'Color',[0 0 0 0.8]); % 半透明黑色误差线
+
+% 在柱子上方标出均值
 for i = 1:3
     text(i, meansT(i) + 0.005, sprintf('%.3f', meansT(i)), ...
         'HorizontalAlignment','center', 'FontSize', 12, 'FontWeight','bold');
 end
 
-xticks(1:3); xticklabels({'Block 1','Block 2','Block 3'});
+xticks(1:3);
+xticklabels({'Block 1','Block 2','Block 3'});
 ylabel('Mean Duration (s)');
 title('Average Reach Duration per Block');
 grid on; box off;
 
-% 控制台打印统计
-fprintf('\n=== Duration Summary by Block ===\n');
-for i = blocks
-    fprintf('Block %d: N=%d, Mean=%.4f s, SD=%.4f s, SEM=%.4f s, Disappear=%.4f s\n', ...
-        i, nT(i), meansT(i), stdT(i), semT(i), Tdisappear(i));
+%% === T-tests among the 3 pairs ===
+pairs = [1 2; 1 3; 2 3];
+y_max = max(meansT + semT) + 0.02; % 起始高度
+increment = 0.02; % 每条横线间隔高度
+
+p_values = nan(1,3);
+
+for p = 1:3
+    a = pairs(p,1);
+    b = pairs(p,2);
+    [~, pval] = ttest2(Dur{a}, Dur{b});
+    p_values(p) = pval;
+
+    % 画显著性横线
+    x1 = a; x2 = b;
+    y = y_max + (p-1)*increment;
+    plot([x1 x2], [y y], 'k', 'LineWidth', 1.5); % 横线
+    plot([x1 x1], [y-0.005 y], 'k', 'LineWidth', 1);
+    plot([x2 x2], [y-0.005 y], 'k', 'LineWidth', 1);
+
+    % 根据显著性画星号
+    if pval < 0.001
+        stars = '***';
+    elseif pval < 0.01
+        stars = '**';
+    elseif pval < 0.05
+        stars = '*';
+    else
+        stars = 'n.s.';
+    end
+    text(mean([x1 x2]), y + 0.005, stars, 'HorizontalAlignment', 'center', ...
+         'FontSize', 14, 'FontWeight', 'bold');
 end
 
-%% 3D reg plane - Euclidean Error 
-% Extract variables
-reach_distances = copy(:,21);
-avg_speed = copy(:,22);
-errors = copy(:,17);
+% 控制台打印结果
+fprintf('\n=== Duration Summary by Block ===\n');
+for i = blocks
+    fprintf('Block %d: N=%d, Mean=%.4f s, SD=%.4f s, SEM=%.4f s\n', ...
+        i, nT(i), meansT(i), stdT(i), semT(i));
+end
 
-% Prepare the design matrix (adding a column of ones for intercept)
-X = [ones(size(reach_distances)), reach_distances, avg_speed];
+fprintf('\n=== Pairwise t-tests ===\n');
+for p = 1:3
+    fprintf('Block %d vs Block %d: p = %.4g\n', pairs(p,1), pairs(p,2), p_values(p));
+end
 
-% Perform multivariate linear regression
-coeffs = regress(errors, X);
-
-% Display regression coefficients
-fprintf('Intercept: %.4f\n', coeffs(1));
-fprintf('Distance coefficient: %.4f\n', coeffs(2));
-fprintf('Average speed coefficient: %.4f\n', coeffs(3));
-
-% 3D scatter plot of the original data
-figure;
-plot3(reach_distances, avg_speed, errors, 'o');
-hold on;
-
-xlim([0 max(reach_distances)]);
-ylim([0 max(avg_speed)]);
-
-% Generate grid for regression plane
-[dist_grid, speed_grid] = meshgrid(linspace(min(reach_distances), max(reach_distances), 20), ...
-                                   linspace(min(avg_speed), max(avg_speed), 20));
-
-% Predict errors using regression model
-error_fit = coeffs(1) + coeffs(2)*dist_grid + coeffs(3)*speed_grid;
-
-% Plot regression plane
-mesh(dist_grid, speed_grid, error_fit);
-xlabel('Reach Distance (mm)');
-ylabel('Average Speed (mm/s)');
-zlabel('Endpoint Euclidean Error (mm)');
-title('Multivariate Linear Regression: Error ~ Reach Distance + Speed');
-grid on;
-hold off;
+%%
 
 %%  Z axis: Gain error ~ reach distance + speed
 % Extract variables
