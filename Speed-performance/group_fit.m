@@ -26,7 +26,7 @@
 
 %%
 clear all
-participant = 'SX';
+% participant = 'SX';
 lifespan = [0.6,0.6*3^(0.25),0.6*3^(0.5)]; %[1.0,0.6,0.8,0.4]; %[1.1,0.9,1.0,0.8,0.6,0.7] 设定各blocks中target的不同时长  %lifespan控制了受试者实际可用的、逐渐减少的目标"可见e时间窗，这一时间越短，任务难度越高（因为受试者必须更快速地完成任务以取得更高分数）。
 for i = 1:3
     copy((1+(i-1)*240):(i*240),3) = lifespan(i);
@@ -43,7 +43,7 @@ for ip = 1:numel(participants)
         load(f);
     end
 
-    %%
+    
     index = NaN(size(data,1),1);
     for i = 1:size(data,1)
         index(i) = ~isnan(sum(data(i,:)));
@@ -52,7 +52,7 @@ for ip = 1:numel(participants)
     validTraX = traXtotal(index==true,:);
     validTraY = traYtotal(index==true,:);
 
-    %%
+    
     pixellength = 0.248;
     Affine2d =tform.T(1:2,1:2);
     [~,s,~] = svd(Affine2d);
@@ -106,7 +106,7 @@ for ip = 1:numel(participants)
     % 在copy中新增第32列：target shrinking speed (mm/s)
     copy(:,32) = copy(:,15) ./ copy(:,31);
 
-    %%  polar coordination
+    % polar coordination
 
     angle_error_in_radian = asin(copy(:,29) ./ copy(:,21));
 
@@ -115,7 +115,7 @@ for ip = 1:numel(participants)
     copy(:,33) = angle_error_in_radian;
     copy(:,34) = angle_error_in_degree;
 
-    %% 3 blocks - conditions graphs
+    % 3 blocks - conditions graphs
 
     lim_scale = 1.2;
 
@@ -128,8 +128,8 @@ for ip = 1:numel(participants)
         avg_speed = copy(block_ind==1,22);
         duration = copy(block_ind==1,16);
 
-        plot(distances,duration,'o');
-        hold on
+        % plot(distances,duration,'o');
+        % hold on
 
         mdl = fitlm(distances,avg_speed);
         linear_fits(1 + cond_ind * 4,ip) = mdl.Coefficients.Estimate(1);
