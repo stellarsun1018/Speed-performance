@@ -24,11 +24,7 @@
 % 31: target shrinking duration(second)
 % 32: target shrinking speed(mm/s)
 
-%%
-lifespan = [0.6,0.6*3^(0.25),0.6*3^(0.5)]; %[1.0,0.6,0.8,0.4]; %[1.1,0.9,1.0,0.8,0.6,0.7] 设定各blocks中target的不同时长  %lifespan控制了受试者实际可用的、逐渐减少的目标"可见e时间窗，这一时间越短，任务难度越高（因为受试者必须更快速地完成任务以取得更高分数）。
-for i = 1:3
-    copy((1+(i-1)*240):(i*240),3) = lifespan(i);
-end
+
 %%
 clear all
 participant = 'SX';
@@ -115,6 +111,8 @@ angle_error_in_degree = rad2deg(angle_error_in_radian);
 
 copy(:,33) = angle_error_in_radian;
 copy(:,34) = angle_error_in_degree;
+
+colors = lines(3);  % 三种颜色
 
 %% 3 blocks - conditions graphs
 
