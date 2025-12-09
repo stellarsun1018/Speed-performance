@@ -136,7 +136,7 @@ for i = 1:3
     mdl = fitlm(distances,avg_speed);
     x_fit = linspace(0, lim_scale * max(copy(:,10)), 2);
     y_fit = mdl.Coefficients.Estimate(1) + mdl.Coefficients.Estimate(2) .* x_fit;
-    plot(x_fit, y_fit, '--', 'Color', colors(i,:), 'LineWidth', 2);
+    plot(x_fit, y_fit, '--', 'LineWidth', 2);
 
 
 % 原始 condition line: speed = distance / lifespan
@@ -182,7 +182,7 @@ for i = 1:3
     mdl = fitlm(distances,duration);
     x_fit = linspace(0, lim_scale * max(copy(:,10)), 2);
     y_fit = mdl.Coefficients.Estimate(1) + mdl.Coefficients.Estimate(2) .* x_fit;
-    plot(x_fit, y_fit, '--', 'Color', colors(i,:), 'LineWidth', 2);
+    plot(x_fit, y_fit, '--', 'LineWidth', 2);
 
     yline(unique(copy(block_ind==1,3)).*0.5,'r--')
     yline(unique(copy(block_ind==1,3)),'b--')

@@ -199,3 +199,7 @@ title("Duration vs Distance")
 legend("Block 1", "Block 2", "Block 3")
 
 
+% delete 
+figure
+
+
