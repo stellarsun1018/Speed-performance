@@ -30,18 +30,16 @@ for i = 1:3
     copy((1+(i-1)*240):(i*240),3) = lifespan(i);
 end
 %%
-% participant = 1;
-% if participant == 1
-%     load('JM_practice_traj_S1_06-Apr-2023_tform.mat')
-%     load('JM_practice_traj_S1c_06-Apr-2023_rawtotal.mat')
-%     load('JM_practice_traj_S1c_06-Apr-2023_traXtotal.mat')
-%     load('JM_practice_traj_S1c_06-Apr-2023_traYtotal.mat')
-% elseif participant == 0
-%     load('pilot_practice_traj_S1_31-Mar-2023_tform.mat')
-%     load('rawComplete.mat')
-%     load('xTrajComplete.mat')
-%     load('yTrajComplete.mat')
-% end
+clear all
+participant = 'LC';
+session = 3;
+fname_preamble = sprintf('data_onlineConf/%s/%s_sptatialTemporalCostFunc_S%d*.mat',participant,participant,session);
+files = dir(fname_preamble);
+for k = 1:numel(files)
+    f = fullfile(files(k).folder, files(k).name);
+    load(f);
+end
+
 %%
 index = NaN(size(data,1),1);
 for i = 1:size(data,1)
@@ -115,8 +113,8 @@ angle_error_in_radian = asin(copy(:,29) ./ copy(:,21));
 
 angle_error_in_degree = rad2deg(angle_error_in_radian);
 
-copy(:,33) = angle_error_in_radian
-copy(:,34) = angle_error_in_degree
+copy(:,33) = angle_error_in_radian;
+copy(:,34) = angle_error_in_degree;
 
 %% 3 blocks - conditions graphs
 
