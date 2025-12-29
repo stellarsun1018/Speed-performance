@@ -2,7 +2,7 @@ clear all
 Screen('Preference', 'SkipSyncTests', 1); 
 cd('C:\Users\labadmin\Documents\Qingjie-GitHub\Speed-performance\Speed-performance\Speed-performance');
 
-subj = 'LL';  
+subj = 'ML';  
 dateTime = clock;                % get time for seed             
 rng(sum(100*dateTime) );      % 也就是给每组实验/数据dataset 编一个编码，确保这组实验的可track
 expName = 'sptatialTemporalCostFunc';
@@ -10,7 +10,7 @@ session = 2;
 redoCalib = 0; % 选1 的话为什么同一个subject做两次calibration就不行了？
 
 outputDir = ['data_onlineConf\' subj];
-if ~exist(outputDir, 'dir')
+if ~exist(outputDir, 'dir') 
     mkdir(outputDir);
 end
 
