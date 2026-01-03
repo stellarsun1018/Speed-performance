@@ -483,9 +483,131 @@ for p = 1:3
     fprintf('Block %d vs Block %d: p = %.4g\n', pairs(p,1), pairs(p,2), p_values(p));
 end
 
-%%
+%% Duration
 
-%%  Z axis: Gain error ~ reach distance + speed
+%% Z axis: Gain error ~ reach distance + Duration copy(:,16) 
+% Extract variables
+reach_distances = copy(:,21);
+reach_dur = copy(:,16);
+Reach_errors = copy(:,23);
+
+% Prepare the design matrix (adding a column of ones for intercept)
+X = [ones(size(reach_distances)), reach_distances, reach_dur];
+
+% Perform multivariate linear regression
+coeffs = regress(Reach_errors, X);
+
+% Display regression coefficients
+fprintf('Intercept: %.4f\n', coeffs(1));
+fprintf('Distance coefficient: %.4f\n', coeffs(2));
+fprintf('Reach duration coefficient: %.4f\n', coeffs(3));
+
+% 3D scatter plot of the original data
+figure;
+plot3(reach_distances, reach_dur, Reach_errors, 'o');
+hold on;
+
+xlim([0 max(reach_distances)]);
+ylim([0 max(reach_dur)]);
+
+% Generate grid for regression plane
+[dist_grid, dur_grid] = meshgrid(linspace(min(reach_distances), max(reach_distances), 20), ...
+                                   linspace(min(reach_dur), max(reach_dur), 20));
+
+% Predict errors using regression model
+error_fit = coeffs(1) + coeffs(2)*dist_grid + coeffs(3)*dur_grid;
+
+% Plot regression plane
+mesh(dist_grid, dur_grid, error_fit);
+xlabel('Reach Distance (mm)');
+ylabel('Reach Duration (s)');
+zlabel('Gain Error (mm)');
+title('Multivariate Linear Regression: Gain Error ~ Reach Distance + Reach Duration');
+grid on;
+hold off;
+
+%% step 2: residuals 
+errors_predicted = X * coeffs;
+
+% Calculate residuals
+residuals1 = Reach_errors - errors_predicted;
+
+% 3D scatter plot of residuals
+figure;
+plot3(reach_distances, reach_dur, residuals1, 'ro');
+xlim([0 max(reach_distances)]);
+ylim([0 max(reach_dur)]);
+
+xlabel('Reach Distance (mm)');
+ylabel('Reach Duration (s)');
+zlabel('Residuals (mm)');
+title('Residuals of Multivariate Linear Regression: Reach Error ~ Distance + Duration');
+grid on;
+
+%% Z axis: Orthognal error ~ reach distance + Duration copy(:,16) 
+% Extract variables
+reach_distances = copy(:,21);
+reach_dur = copy(:,16);
+Orth_errors = copy(:,29);
+
+% Prepare the design matrix (adding a column of ones for intercept)
+X = [ones(size(reach_distances)), reach_distances, reach_dur];
+
+% Perform multivariate linear regression
+coeffs = regress(Orth_errors, X);
+
+% Display regression coefficients
+fprintf('Intercept: %.4f\n', coeffs(1));
+fprintf('Distance coefficient: %.4f\n', coeffs(2));
+fprintf('Reach duration coefficient: %.4f\n', coeffs(3));
+
+% 3D scatter plot of the original data
+figure;
+plot3(reach_distances, reach_dur, Orth_errors, 'o');
+hold on;
+
+xlim([0 max(reach_distances)]);
+ylim([0 max(reach_dur)]);
+
+% Generate grid for regression plane
+[dist_grid, dur_grid] = meshgrid(linspace(min(reach_distances), max(reach_distances), 20), ...
+                                   linspace(min(reach_dur), max(reach_dur), 20));
+
+% Predict errors using regression model
+error_fit = coeffs(1) + coeffs(2)*dist_grid + coeffs(3)*dur_grid;
+
+% Plot regression plane
+mesh(dist_grid, dur_grid, error_fit);
+xlabel('Reach Distance (mm)');
+ylabel('Reach Duration (s)');
+zlabel('Orthognal Error (mm)');
+title('Multivariate Linear Regression: Orthognal Error ~ Reach Distance + Reach Duration');
+grid on;
+hold off;
+
+%% step 2: residuals 
+errors_predicted = X * coeffs;
+
+% Calculate residuals
+residuals1 = Orth_errors - errors_predicted;
+
+% 3D scatter plot of residuals
+figure;
+plot3(reach_distances, reach_dur, residuals1, 'ro');
+xlim([0 max(reach_distances)]);
+ylim([0 max(reach_dur)]);
+
+xlabel('Reach Distance (mm)');
+ylabel('Reach Duration (s)');
+zlabel('Residuals (mm)');
+title('Residuals of Multivariate Linear Regression: Orthognal Error ~ Distance + Duration');
+grid on;
+
+
+%% Speed
+
+
+%%  Z axis: Gain error ~ reach distance + speed (avg_speed = copy(:,22))
 % Extract variables
 reach_distances = copy(:,21);
 avg_speed = copy(:,22);
@@ -544,27 +666,26 @@ zlabel('Residuals (mm)');
 title('Residuals of Multivariate Linear Regression: Reach Error ~ Distance + Speed');
 grid on;
 
-%% Z axis: angular_error_in_degree (orthognal) ~ reach distance + speed
-
+%% Z axis: Orthognal error ~ reach distance + speed (avg_speed = copy(:,22))
 % Extract variables
 reach_distances = copy(:,21);
 avg_speed = copy(:,22);
-angle_error_in_degree = copy(:,34);
+Orth_errors = copy(:,29);
 
 % Prepare the design matrix (adding a column of ones for intercept)
 X = [ones(size(reach_distances)), reach_distances, avg_speed];
 
 % Perform multivariate linear regression
-coeffs = regress(angle_error_in_degree, X);
+coeffs = regress(Orth_errors, X);
 
 % Display regression coefficients
 fprintf('Intercept: %.4f\n', coeffs(1));
 fprintf('Distance coefficient: %.4f\n', coeffs(2));
-fprintf('Average speed coefficient: %.4f\n', coeffs(3));
+fprintf('Ave speed coefficient: %.4f\n', coeffs(3));
 
 % 3D scatter plot of the original data
 figure;
-plot3(reach_distances, avg_speed, angle_error_in_degree, 'o');
+plot3(reach_distances, avg_speed, Orth_errors, 'o');
 hold on;
 
 xlim([0 max(reach_distances)]);
@@ -580,27 +701,89 @@ error_fit = coeffs(1) + coeffs(2)*dist_grid + coeffs(3)*speed_grid;
 % Plot regression plane
 mesh(dist_grid, speed_grid, error_fit);
 xlabel('Reach Distance (mm)');
-ylabel('Average Speed (mm/s)');
-zlabel('Angular error (degree)');
-title('Multivariate Linear Regression: Angle error ~ Reach Distance + Speed');
+ylabel(''Average Speed (mm/s)'');
+zlabel('Orthognal Error (mm)');
+title('Multivariate Linear Regression: Orthognal Error ~ Reach Distance + Speed');
 grid on;
 hold off;
 
-%% step 2: orthognal error residuals 
+%% step 2: residuals 
 errors_predicted = X * coeffs;
 
 % Calculate residuals
-residuals2 = angle_error_in_degree - errors_predicted;
+residuals1 = Orth_errors - errors_predicted;
 
 % 3D scatter plot of residuals
 figure;
-plot3(reach_distances, avg_speed, residuals2, 'ro');
+plot3(reach_distances, avg_speed, residuals1, 'ro');
 xlim([0 max(reach_distances)]);
 ylim([0 max(avg_speed)]);
 
 xlabel('Reach Distance (mm)');
 ylabel('Average Speed (mm/s)');
 zlabel('Residuals (mm)');
-title('Residuals of Multivariate Linear Regression: Angular Error ~ Distance + Speed');
+title('Residuals of Multivariate Linear Regression: Orthognal Error ~ Distance + Speed');
 grid on;
 
+
+%%
+%% Z axis: angular_error_in_degree ~ reach distance + speed
+% 
+% % Extract variables
+% reach_distances = copy(:,21);
+% avg_speed = copy(:,22);
+% angle_error_in_degree = copy(:,34);
+% 
+% % Prepare the design matrix (adding a column of ones for intercept)
+% X = [ones(size(reach_distances)), reach_distances, avg_speed];
+% 
+% % Perform multivariate linear regression
+% coeffs = regress(angle_error_in_degree, X);
+% 
+% % Display regression coefficients
+% fprintf('Intercept: %.4f\n', coeffs(1));
+% fprintf('Distance coefficient: %.4f\n', coeffs(2));
+% fprintf('Average speed coefficient: %.4f\n', coeffs(3));
+% 
+% % 3D scatter plot of the original data
+% figure;
+% plot3(reach_distances, avg_speed, angle_error_in_degree, 'o');
+% hold on;
+% 
+% xlim([0 max(reach_distances)]);
+% ylim([0 max(avg_speed)]);
+% 
+% % Generate grid for regression plane
+% [dist_grid, speed_grid] = meshgrid(linspace(min(reach_distances), max(reach_distances), 20), ...
+%                                    linspace(min(avg_speed), max(avg_speed), 20));
+% 
+% % Predict errors using regression model
+% error_fit = coeffs(1) + coeffs(2)*dist_grid + coeffs(3)*speed_grid;
+% 
+% % Plot regression plane
+% mesh(dist_grid, speed_grid, error_fit);
+% xlabel('Reach Distance (mm)');
+% ylabel('Average Speed (mm/s)');
+% zlabel('Angular error (degree)');
+% title('Multivariate Linear Regression: Angle error ~ Reach Distance + Speed');
+% grid on;
+% hold off;
+% 
+% %% step 2: Angular error residuals 
+% errors_predicted = X * coeffs;
+% 
+% % Calculate residuals
+% residuals2 = angle_error_in_degree - errors_predicted;
+% 
+% % 3D scatter plot of residuals
+% figure;
+% plot3(reach_distances, avg_speed, residuals2, 'ro');
+% xlim([0 max(reach_distances)]);
+% ylim([0 max(avg_speed)]);
+% 
+% xlabel('Reach Distance (mm)');
+% ylabel('Average Speed (mm/s)');
+% zlabel('Residuals (mm)');
+% title('Residuals of Multivariate Linear Regression: Angular Error ~ Distance + Speed');
+% grid on;
+% 
