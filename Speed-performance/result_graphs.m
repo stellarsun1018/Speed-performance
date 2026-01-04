@@ -544,6 +544,174 @@ zlabel('Residuals (mm)');
 title('Residuals of Multivariate Linear Regression: Reach Error ~ Distance + Duration');
 grid on;
 
+%% add Countours 加入等高线的residuals图 （version 1） 
+errors_predicted = X * coeffs;
+
+% Calculate residuals
+residuals1 = Reach_errors - errors_predicted;
+
+% 3D scatter plot of residuals
+figure;
+plot3(reach_distances, reach_dur, residuals1, 'ro');
+hold on;
+
+xlim([0 max(reach_distances)]);
+ylim([0 max(reach_dur)]);
+
+% ---- Build grid for residual contour ----
+[dist_grid, dur_grid] = meshgrid( ...
+    linspace(min(reach_distances), max(reach_distances), 40), ...
+    linspace(min(reach_dur), max(reach_dur), 40));
+
+% Interpolate residuals onto grid
+residual_grid = griddata( ...
+    reach_distances, reach_dur, residuals1, ...
+    dist_grid, dur_grid, 'natural');
+
+% ---- Add contour projection on bottom plane ----
+z_level = min(residual_grid(:));  % 投影到最低 residual平面？还是说应该投影到零残差平面？
+contour3(dist_grid, dur_grid, residual_grid, ...
+         6, 'k', 'LineWidth', 1);
+
+xlabel('Reach Distance (mm)');
+ylabel('Reach Duration (s)');
+zlabel('Residuals (mm)');
+title('Residuals of Multivariate Linear Regression: Reach Error ~ Distance + Duration');
+grid on;
+
+view(0,90)
+colorbar
+
+
+%% add Countours 加入等高线的residuals图 （version 2） 
+errors_predicted = X * coeffs;
+
+% Calculate residuals
+residuals1 = Reach_errors - errors_predicted;
+
+% ===== SD heatmap of residuals (adaptive bins) + contours =====
+% Required inputs already exist:
+%   reach_distances (mm)  -> x
+%   reach_dur (s)         -> y
+%   residuals1 (mm)       -> z  (treat as raw motor error residual)
+
+% ---------- parameters you may tweak ----------
+targetPerBin = 6;     % 统计上希望“平均每个bin大概有多少trial”(越大 -> bin越少 -> 更稳定)
+minBin = 8;           % 最少每个维度多少个bin
+maxBin = 18;          % 最多每个维度多少个bin（太大容易空bin -> 不好看也不稳）
+minN = 3;             % 每个bin至少多少个trial才计算SD（<minN会先置NaN再插值）
+doSmooth = true;      % 平滑让contour更顺
+smoothSigma_bins = 1.0; % 平滑强度（单位：bin，1~1.5常用）
+fineN = 220;          % 显示用的细网格分辨率（越大越细腻）
+
+nLevels = 12;         % contour层数
+overlayPoints = true; % 是否叠加原始点云
+
+% ---------- clean vectors ----------
+x = reach_distances(:);
+y = reach_dur(:);
+z = residuals1(:);
+
+valid = isfinite(x) & isfinite(y) & isfinite(z);
+x = x(valid); y = y(valid); z = z(valid);
+
+n = numel(z);
+
+% ---------- choose a sensible bin count automatically ----------
+nb = round(sqrt(n / targetPerBin));   % e.g. n=720,targetPerBin=6 -> nb~11
+nb = max(minBin, min(maxBin, nb));
+nbx = nb; nby = nb;
+
+% ---------- edges ----------
+xedges = linspace(min(x), max(x), nbx+1);
+yedges = linspace(min(y), max(y), nby+1);
+
+% ---------- bin assignment ----------
+[~,~,bx] = histcounts(x, xedges);
+[~,~,by] = histcounts(y, yedges);
+in = (bx>0) & (by>0);
+bx = bx(in); by = by(in);
+x  = x(in);  y  = y(in);  z  = z(in);
+
+% ---------- per-bin N, sum, sumsq (stable SD) ----------
+countGrid = accumarray([by, bx], 1,    [nby, nbx], @sum, 0);
+sumGrid   = accumarray([by, bx], z,    [nby, nbx], @sum, 0);
+sumSqGrid = accumarray([by, bx], z.^2, [nby, nbx], @sum, 0);
+
+% unbiased sample variance
+varGrid = (sumSqGrid - (sumGrid.^2)./max(countGrid,1)) ./ max(countGrid-1, 1);
+varGrid(countGrid < minN) = NaN;
+varGrid(varGrid < 0) = 0;     % numerical guard
+sdGrid = sqrt(varGrid);
+
+% 如果minN太严格导致可用bin太少，自动放宽到2
+if nnz(isfinite(sdGrid)) < 12
+    minN = 2;
+    varGrid = (sumSqGrid - (sumGrid.^2)./max(countGrid,1)) ./ max(countGrid-1, 1);
+    varGrid(countGrid < minN) = NaN;
+    varGrid(varGrid < 0) = 0;
+    sdGrid = sqrt(varGrid);
+end
+
+% ---------- bin centers ----------
+xc = (xedges(1:end-1) + xedges(2:end)) / 2;   % 1×nbx
+yc = (yedges(1:end-1) + yedges(2:end)) / 2;   % 1×nby
+[Xc, Yc] = meshgrid(xc, yc);                  % nby×nbx
+
+% ---------- fill empty bins so the heatmap is FULL (关键：铺满渐变颜色) ----------
+mask = isfinite(sdGrid);
+F = scatteredInterpolant(Xc(mask), Yc(mask), sdGrid(mask), 'natural', 'nearest');
+sdFill = F(Xc, Yc);   % now full matrix (no NaN)
+
+% ---------- smooth in bin-space (optional, makes contours nice) ----------
+sdSmooth = sdFill;
+if doSmooth
+    ksz = max(3, 2*ceil(3*smoothSigma_bins)+1);
+    r = (-floor(ksz/2)):(floor(ksz/2));
+    [kx, ky] = meshgrid(r, r);
+    K = exp(-(kx.^2 + ky.^2) / (2*smoothSigma_bins^2));
+    K = K / sum(K(:));
+    sdSmooth = conv2(sdSmooth, K, 'same');
+end
+
+% ---------- upsample to a fine grid for a smooth-looking heatmap ----------
+xq = linspace(min(xc), max(xc), fineN);
+yq = linspace(min(yc), max(yc), fineN);
+[XX, YY] = meshgrid(xq, yq);
+
+% cubic makes it look like your attached smooth gradients
+sdFine = interp2(xc, yc, sdSmooth, XX, YY, 'cubic');
+
+% ---------- plot: imagesc + contour (like your example) ----------
+figure('Name','Residual SD heatmap (adaptive bins) + contours');
+
+imagesc(xq, yq, sdFine);
+set(gca, 'YDir', 'normal');   % axis xy
+axis tight;
+hold on;
+
+contour(xq, yq, sdFine, nLevels, 'k', 'LineWidth', 1);
+
+if overlayPoints
+    scatter(x, y, 10, 'k', 'filled', ...
+        'Marker', 's', 'MarkerFaceAlpha', 0.18, 'MarkerEdgeAlpha', 0.18);
+end
+
+cb = colorbar;
+cb.Label.String = 'SD of residual (mm)';
+
+% contrast: avoid "looks like no color"
+cl = prctile(sdFine(:), [2 98]);
+caxis(cl);
+
+xlabel('Reach Distance (mm)');
+ylabel('Reach Duration (s)');
+title(sprintf('Residual SD heatmap (bins=%dx%d, targetPerBin=%g, minN=%d)', nbx, nby, targetPerBin, minN));
+grid on;
+hold off;
+
+
+
 %% Z axis: Orthognal error ~ reach distance + Duration copy(:,16) 
 % Extract variables
 reach_distances = copy(:,21);
