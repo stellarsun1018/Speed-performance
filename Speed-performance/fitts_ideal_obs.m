@@ -91,13 +91,27 @@ end
 copy(:,31) = copy(:,15) ./ copy(:,3); % 31: target shrinking speed(mm/s)
 
 %% Fit Fitts's Law Parameter
-distances = copy(:,10);
+distances = copy(:,10); % using actual or 
 gain_error = copy(:,23); % biased/signed
 dir_error = copy(:,29); % biased/signed
 durations = copy(:,16);
 speeds = copy(:,22);
 end_size = copy(:,15) .* durations ./ copy(:,3);
 
+%% Recenter by offseting with a lienar bias multivariate prediction
+
+X = [ones(size(distances)), distances, durations];
+
+gain_coeffs = regress(gain_error, X);
+gain_bias_offset = gain_coeffs(1) + gain_coeffs(2)*distances + gain_coeffs(3)*durations;
+gain_error = gain_error - gain_bias_offset;
+
+dir_coeffs = regress(dir_error, X);
+dir_bias_offset = dir_coeffs(1) + dir_coeffs(2)*distances + dir_coeffs(3)*durations;
+dir_error = dir_error - dir_bias_offset;
+
+
+%%
 function Sigma = local_cov_pred(stdF, phi, dist, dur)
 sig_gain = stdF(phi(1:2), dist, dur);      % σ_g in linear scale
 sig_dir = stdF(phi(3:4), dist, dur);      % σ_d in linear scale
@@ -121,13 +135,6 @@ stdF = fun_std;  % alias: std in linear scale (Fitts-style)
 phiUB = [ 10,  2,  10,  2,  0.95];
 phiLB = [-10, eps,-10, eps, -0.95];
 
-% Good initializer: reuse your 1D fits if available, else random-in-range
-phi0 = [rand*mean([phiUB(1),phiLB(1)]),  ... % IP_g
-    rand*mean([phiUB(2),phiLB(2)]),  ... % k_g
-    rand*mean([phiUB(3),phiLB(3)]),  ... % IP_d
-    rand*mean([phiUB(4),phiLB(4)]),  ... % k_d
-    0];                                  % rho
-
 
 % Negative log-likelihood for zero-mean 2D Gaussian with sample-wise Sigma
 fun_nll2d = @(phi) ...
@@ -140,8 +147,24 @@ fun_nll2d = @(phi) ...
     (dir_error.^2) ./ (stdF(phi(3:4),distances,durations).^2) + ...
     2*log(2*pi) ));
 
-% Fit all parameters jointly
-phi_hat = bads(fun_nll2d, phi0, phiLB, phiUB);
+
+% Iterative BADS
+num_runs = 10;
+phi_hat_array = NaN(num_runs,size(phiUB,2));
+nll_from_runs = NaN(num_runs,1);
+for i = 1:num_runs
+    phi0 = [rand*mean([phiUB(1),phiLB(1)]),  ... % IP_g
+        rand*mean([phiUB(2),phiLB(2)]),  ... % k_g
+        rand*mean([phiUB(3),phiLB(3)]),  ... % IP_d
+        rand*mean([phiUB(4),phiLB(4)]),  ... % k_d
+        0];
+
+    phi_hat_array(i,:) = bads(fun_nll2d, phi0, phiLB, phiUB);
+    nll_from_runs(i) = fun_nll2d(phi_hat_array(i,:));
+end
+
+[~,best_ind] = min(nll_from_runs);
+phi_hat = phi_hat_array(best_ind,:);
 
 % Covariance predictor:
 %  - If dist,dur are scalars: returns a 2x2 matrix.
