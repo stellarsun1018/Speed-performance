@@ -31,8 +31,8 @@ lifespan = [0.6,0.6*3^(0.25),0.6*3^(0.5)]; %[1.0,0.6,0.8,0.4]; %[1.1,0.9,1.0,0.8
 for i = 1:3
     copy((1+(i-1)*240):(i*240),3) = lifespan(i);
 end
-participants = {"JHL", "JH", "LC", "LN", "RC", "SM", "ML", "SX", "SY"};
-% participants = {"JH", "JHL", "LN", "LC"};
+participants = {"JHL", "JH", "LC", "LN", "RC", "SM", "ML", "SX", "SY", "WMZ", "YL", "LL"};
+
 linear_fits = NaN(4 * 3, numel(participants)); % three blocks * 4 parameters
 for ip = 1:numel(participants)
     part = participants{ip};
@@ -98,13 +98,13 @@ for ip = 1:numel(participants)
     copy(:,31) = NaN; % 初始化为NaN
 
     % 根据 trial order 赋值
-    copy(copy(:,27)>=1 & copy(:,27)<=60, 31)   = 1.0;
-    copy(copy(:,27)>=61 & copy(:,27)<=120, 31) = 0.6;
-    copy(copy(:,27)>=121 & copy(:,27)<=180,31) = 0.8;
-    copy(copy(:,27)>=181 & copy(:,27)<=240,31) = 0.4;
+    % copy(copy(:,27)>=1 & copy(:,27)<=60, 31)   = 1.0;
+    % copy(copy(:,27)>=61 & copy(:,27)<=120, 31) = 0.6;
+    % copy(copy(:,27)>=121 & copy(:,27)<=180,31) = 0.8;
+    % copy(copy(:,27)>=181 & copy(:,27)<=240,31) = 0.4;
 
     % 在copy中新增第32列：target shrinking speed (mm/s)
-    copy(:,32) = copy(:,15) ./ copy(:,31);
+    % copy(:,32) = copy(:,15) ./ copy(:,31);
 
     % polar coordination
 
