@@ -480,7 +480,7 @@ for i = 1:rows
 
     %%%%%%%%% 22222 %%%%%%%%%%
     ax_handles(i, 2) = subplot(rows, column_num, plot_idx * column_num + 2);
-    current_id_map = log2( 2 .* current_size_map ./ smooth_dist);
+    current_id_map = log2( 2 .* smooth_dist ./ current_size_map);
     imagesc(current_id_map)
     hold on
     contour(1:step_n, 1:step_n, current_id_map, 'LineColor', 'k', 'LineWidth', 1);
@@ -501,7 +501,7 @@ for i = 1:rows
 
     %%%%%%%%% 33333 %%%%%%%%%%
     ax_handles(i, 3) = subplot(rows, column_num, plot_idx * column_num + 3);
-    current_id_map = log2( 2 .* current_size_map ./ smooth_dist);
+    current_id_map = log2( 2 .* smooth_dist ./ current_size_map);
     current_ip_map = current_id_map ./ smooth_dur';
     imagesc(current_ip_map)
     hold on
