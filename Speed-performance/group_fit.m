@@ -25,7 +25,7 @@
 % 32: target shrinking speed(mm/s)
 
 %%
-clear; clc;
+clear all
 
 participants = {"JHL","JH","LC", "LN", "RC", "SM", "ML", "SX", "SY", "WMZ", "YL", "LL"};
 
@@ -229,8 +229,6 @@ sgtitle("12 subjects: regression lines (speed vs distance) overlaid per block");
 legend('Location','northwest', 'NumColumns', 2);
 
 %%
-%%
-clear all
 % participant = 'SX';
 lifespan = [0.6,0.6*3^(0.25),0.6*3^(0.5)]; %[1.0,0.6,0.8,0.4]; %[1.1,0.9,1.0,0.8,0.6,0.7] 设定各blocks中target的不同时长  %lifespan控制了受试者实际可用的、逐渐减少的目标"可见e时间窗，这一时间越短，任务难度越高（因为受试者必须更快速地完成任务以取得更高分数）。
 for i = 1:3
@@ -340,8 +338,8 @@ for ip = 1:numel(participants)
         avg_speed = copy(block_ind==1,22);
         duration = copy(block_ind==1,16);
 
-        plot(distances,duration,'o');
-        hold on
+        % plot(distances,duration,'o');
+        % hold on
 
         mdl = fitlm(distances,avg_speed);
         linear_fits(1 + cond_ind * 4,ip) = mdl.Coefficients.Estimate(1);
@@ -454,7 +452,5 @@ title("Duration vs Distance")
 legend("Block 1", "Block 2", "Block 3")
 
 
-% delete 
-figure
 
 
