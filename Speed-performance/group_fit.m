@@ -25,7 +25,8 @@
 % 32: target shrinking speed(mm/s)
 
 %%
-clear; clc;
+clear; 
+clc;
 
 participants = {"JHL","JH","LC", "LN", "RC", "SM", "ML", "SX", "SY", "WMZ", "YL", "LL"};
 
@@ -170,7 +171,7 @@ for ip = 1:numel(participants)
     end
 end
 
-%% ====== Plot: 3 subplots, overlay 12 regression lines ======
+%% ====== Plot: 3 subplots, overlay 12 regression lines ====== version 1
 figure('Color','w');
 for b = 1:nBlocks
     subplot(1,3,b); hold on;
@@ -227,6 +228,97 @@ sgtitle("12 subjects: regression lines (speed vs distance) overlaid per block");
 
 % legend 太大时可以改成 'bestoutside' 或者注释掉
 legend('Location','northwest', 'NumColumns', 2);
+
+%%
+%% ====== Plot: 3 subplots, overlay regression lines ====== final version
+figure('Color','w');
+
+blockTitles = { ...
+    'Block 1 (short distances)', ...
+    'Block 2 (medium distances)', ...
+    'Block 3 (long distances)' ...
+};
+
+for b = 1:nBlocks
+    subplot(1,3,b); 
+    hold on;
+
+    x_max = lim_scale * maxDistBlock(b);
+    if x_max <= 0
+        title(blockTitles{b});
+        continue;
+    end
+    x_fit = linspace(0, x_max, 2);
+
+    % --- subject regression lines (all black, solid) ---
+    y_max_fit = 0;
+    firstSubjectPlotted = false;
+
+    for ip = 1:numel(participants)
+        a = fits_speed(b,1,ip);
+        s = fits_speed(b,2,ip);
+        if isnan(a) || isnan(s)
+            continue;
+        end
+
+        y_fit = a + s .* x_fit;
+
+        if ~firstSubjectPlotted
+            plot(x_fit, y_fit, '-', 'LineWidth', 1, ...
+                'Color', 'k', ...
+                'DisplayName', 'Individual linear fits');
+            firstSubjectPlotted = true;
+        else
+            plot(x_fit, y_fit, '-', 'LineWidth', 1, ...
+                'Color', 'k', ...
+                'HandleVisibility', 'off');
+        end
+
+        y_max_fit = max(y_max_fit, max(y_fit));
+    end
+
+    % --- condition lines (use median lifespan across subjects for this block) ---
+    life = median(lifeBlockSubs(b, ~isnan(lifeBlockSubs(b,:))), 'omitnan');
+    if ~isnan(life) && life > 0
+        y_cond = x_fit ./ life;
+        plot(x_fit, y_cond, '--', ...
+            'Color', [0 0.4 0.8], 'LineWidth', 1.5, ...
+            'DisplayName', 'Disappear deadline');
+
+        y_half = x_fit ./ (0.5 * life);
+        plot(x_fit, y_half, '--r', 'LineWidth', 1.5, ...
+            'DisplayName', 'Half-target time');
+    end
+
+    % --- labels & title ---
+    xlabel("Target Distance (mm)");
+    ylabel("Average Speed (mm/s)");
+    title(blockTitles{b});
+
+    % --- axes ---
+    y_max = max([ ...
+        maxSpdBlock(b) * lim_scale, ...
+        y_max_fit, ...
+        exist('y_cond','var')  * max(y_cond) + ~exist('y_cond','var')  * 0, ...
+        exist('y_half','var') * max(y_half) + ~exist('y_half','var') * 0 ...
+    ]);
+
+    if y_max <= 0
+        y_max = 1;
+    end
+
+    xlim([0, x_max]);
+    ylim([0, lim_scale * y_max]);
+
+    grid on;
+
+    % 清理变量，避免影响下一个 block
+    clear y_cond y_half
+end
+
+% --- global title & legend ---
+
+legend('Location','northeast');
 
 %%
 %%
