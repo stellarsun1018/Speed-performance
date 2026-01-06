@@ -27,10 +27,9 @@
 %%
 clear all
 
-% participants = {"JHL","JH","LC", "LN", "RC", "SM", "ML", "SX", "SY", "WMZ", "YL", "LL"};
-participants = {"JHL"};
+participants = {"JHL","JH","LC", "LN", "RC", "SM", "ML", "SX", "SY", "WMZ", "YL", "LL"};
+% participants = {"JHL"};
 
-% 如果你想按 session 读（像你上面 SX 那样），就用这一段 pattern：
 use_session = false;   % true: 用 S%d 方式；false: 用 usable 方式
 session = 3;
 
@@ -133,7 +132,7 @@ for ip = 1:numel(participants)
     reach_distances = copy(:,21);
     avg_speed = copy(:,22);
     Reach_errors = copy(:,23);
-    
+
     % Prepare the design matrix (adding a column of ones for intercept)
     X = [ones(size(reach_distances)), reach_distances, avg_speed];
 
@@ -143,67 +142,40 @@ for ip = 1:numel(participants)
     errors_predicted = X * coeffs;
     residuals = Reach_errors - errors_predicted;
 
-    
+    nbin_dist  = 8;
+    nbin_speed = 8;
+
+    figure
+
+    subplot(2,2,1)
+    scatter(reach_distances,residuals,10,'filled')
+    xlabel('Reach distance'); ylabel('Residuals'); yline(0,'--')
+
+    subplot(2,2,2)
+    scatter(avg_speed,residuals,10,'filled')
+    xlabel('Average speed'); ylabel('Residuals'); yline(0,'--')
+
+    subplot(2,2,3)
+    edges = linspace(min(reach_distances), max(reach_distances), nbin_dist+1);
+    binID = discretize(reach_distances, edges);
+    binCenters = (edges(1:end-1) + edges(2:end)) / 2;
+    std_dist = accumarray(binID, residuals, [nbin_dist 1], @std, NaN);
+    plot(binCenters, std_dist, 'o-')
+    xlabel('Reach distance'); ylabel('S.D. of residuals')
+
+    subplot(2,2,4)
+    edges = linspace(min(avg_speed), max(avg_speed), nbin_speed+1);
+    binID = discretize(avg_speed, edges);
+    binCenters = (edges(1:end-1) + edges(2:end)) / 2;
+    std_speed = accumarray(binID, residuals, [nbin_speed 1], @std, NaN);
+    plot(binCenters, std_speed, 'o-')
+    xlabel('Average speed'); ylabel('S.D. of residuals')
+
+    saveas(gcf,fullfile('results', 'plots', 'fig5',sprintf('%s.png', part)));
 
 end
 
 %%
-figure 
-
-idx = 1:numel(participants);
-
-x0    = linspace(-0.5,  0.6, n); 
-xdist = linspace(-0.5,  0.6, n); 
-xspd  = linspace(1,  2.1, n); 
-
-subplot(1,2,1)
-errorbar(x0,beta_0(1,:),beta_0(2,:),beta_0(3,:),'o','MarkerFaceColor','auto','LineWidth',1);
-
-yline(0,'--');
-xlim([x0(1)-0.1,x0(end)+0.1])
-ylim([-25,25])
-xticks(x0)
-xticklabels(participants)
-legend({'Intercept'}, 'Location','northeast');
-xlabel('Participant');
-ylabel('Intercept');
-box off
-
-
-subplot(1,2,2)
-errorbar(xdist, beta_dist(1,:), beta_dist(2,:), beta_dist(3,:),'o','MarkerFaceColor','auto','LineWidth',1);
-hold on
-errorbar(xspd,  beta_spd(1,:),  beta_spd(2,:),  beta_spd(3,:),'o','MarkerFaceColor','auto','LineWidth',1); 
-hold off
-
-yline(0,'--');
-xlim([xdist(1)-0.2,xspd(end)+0.2])
-ylim([-0.2,0.2])
-xticks([mean(xdist),mean(xspd)])
-xticklabels(["Distance","Speed"])
-xlabel('Factor');
-ylabel('Slope');
-legend({'\beta_{distance}','\beta_{speed}'}, 'Location','northeast');
-box off
-
-%%
 figure
-xdist = linspace(-0.25,  43.75, n); 
-xspd  = linspace(0.25,  44.25, n); 
-errorbar(xdist, beta_dist(1,:), beta_dist(2,:), beta_dist(3,:),'o','MarkerFaceColor','auto','LineWidth',1);
-hold on
-errorbar(xspd,  beta_spd(1,:),  beta_spd(2,:),  beta_spd(3,:),'o','MarkerFaceColor','auto','LineWidth',1); 
-hold off
 
-yline(0,'--');
-xlim([xspd(1)-2,xspd(end)+2])
-ylim([-0.2,0.2])
-
-xticks(mean([xdist;xspd]))
-xticklabels(participants)
-xlabel('Participant');
-ylabel('Slope');
-legend({'\beta_{distance}','\beta_{speed}'}, 'Location','northeast');
-box off
-hold off
-
+saveas(gcf,fullfile('results', 'plots', 'fig5',sprintf('%s.png', part)));
