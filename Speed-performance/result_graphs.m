@@ -103,26 +103,21 @@ copy(copy(:,27)>=181 & copy(:,27)<=240,31) = 0.4;
 % 在copy中新增第32列：target shrinking speed (mm/s)
 copy(:,32) = copy(:,15) ./ copy(:,31);
 
-%%  polar coordination 
 
-angle_error_in_radian = asin(copy(:,29) ./ copy(:,21));
-
-angle_error_in_degree = rad2deg(angle_error_in_radian);
-
-copy(:,33) = angle_error_in_radian;
-copy(:,34) = angle_error_in_degree;
-
-colors = lines(3);  % 三种颜色
-
-
-
-%% 3 blocks - conditions graphs
+%% 3 blocks - conditions graphs SPEED
 
 lim_scale = 1.2;
+colors = lines(3); % 蓝/红/黄 metrics
+
+blockNames = {'Block 1 (short distances)', ...
+              'Block 2 (medium distances)', ...
+              'Block 3 (long distances)'};
+
 figure()
 for i = 1:3
     block_ind = zeros(size(copy,1),1);
     block_ind((1+(i-1)*240):(i*240)) = 1;
+    
     subplot(1,3,i)
 
     distances = copy(block_ind==1,10);
@@ -130,13 +125,14 @@ for i = 1:3
     x = linspace(0,lim_scale*max(copy(:,10)),2);
     y = x ./ unique(copy(block_ind==1,3));
     
-    plot(distances,avg_speed,'o');
+    % plot(distances,avg_speed,'o');
+    scatter(distances, avg_speed, 25, colors(i,:), 'o');
     hold on
 
     mdl = fitlm(distances,avg_speed);
     x_fit = linspace(0, lim_scale * max(copy(:,10)), 2);
     y_fit = mdl.Coefficients.Estimate(1) + mdl.Coefficients.Estimate(2) .* x_fit;
-    plot(x_fit, y_fit, '--', 'LineWidth', 2);
+    plot(x_fit, y_fit, 'k-', 'LineWidth', 1);
 
 
 % 原始 condition line: speed = distance / lifespan
@@ -149,7 +145,8 @@ for i = 1:3
     hold off
     xlabel("Target Distance (mm)");
     ylabel("Average Speed (mm/s)");
-    legend('Trial data','Linear Fit','Min speed (match disappear deadline)', 'Min speed (half-size target)','Location','northwest')
+    title(blockNames{i})
+    legend('Data','Linear Fit','Disappear deadline', 'Half-target time','Location','southeast')
     xlim([0,lim_scale * max(copy(:,10))]);
     ylim([0,lim_scale * max(copy(:,22))]);
 
@@ -161,12 +158,12 @@ for i = 1:3
     % ylim([0,lim_scale * max(copy(:,22))]);
 end
 
-sgtitle("Arriving earlier for shorter distances and later for longer distances")
+% sgtitle("Arriving earlier for shorter distances and later for longer distances")
 
 %%
 %% 3 blocks - conditions graphs DURATION
 
-% lim_scale = 1.2;
+lim_scale = 1.2;
 figure()
 for i = 1:3
     block_ind = zeros(size(copy,1),1);
@@ -206,6 +203,9 @@ sgtitle("Arriving earlier for shorter distances and later for longer distances")
 %% Overlay all 3 blocks with regression lines through origin
 figure;
 colors = lines(3);  % 三种颜色
+% blockColors = [0 0.45 0.95;   % blue
+%                1 0 0;        % red
+%                1 0.9 0];     % yellow
 
 % 初始化 legend 对象数组
 h_scatter = gobjects(3,1);
@@ -225,7 +225,7 @@ for i = 1:3
     y_fit = mdl.Coefficients.Estimate(1) + mdl.Coefficients.Estimate(2) .* x_fit;
 
     % 虚线拟合线，并保存句柄
-    h_line(i) = plot(x_fit, y_fit, '--', 'Color', colors(i,:), 'LineWidth', 2);
+    h_line(i) = plot(x_fit, y_fit, 'k-', 'LineWidth', 1.3);
 
     % 显示 slope
     fprintf('Block %d: slope = %.2f, implied lifespan = %.2f sec\n', i, k, 1/k);
@@ -236,12 +236,17 @@ ylim([0,lim_scale * max(copy(:,22))]);
 
 xlabel('Target Distance (mm)');
 ylabel('Average Speed (mm/s)');
-title('Distance vs Speed (3 Blocks)');
+% title('Distance vs Speed (3 Blocks)');
 
 % 用回归线句柄生成 legend（不是散点）
-legend(h_line, ...
-    {'Block 1 (slope)', 'Block 2 (slope)', 'Block 3 (slope)'}, ...
-    'Location', 'northwest');
+h_fit_legend = plot(nan, nan, 'k-', 'LineWidth', 1); % dummy line for legend
+
+legend([h_scatter(1), h_scatter(2), h_scatter(3), h_fit_legend], ...
+       {'Block 1 (short distance)', ...
+        'Block 2 (medium distance)', ...
+        'Block 3 (long distance)', ...
+        'Regression fit lines'}, ...
+       'Location', 'northwest');
 
 grid on;
 
@@ -254,7 +259,7 @@ trialsPerBlock = 240;
 blocks = 1:3;
 
 % 颜色（与要求一致：红/蓝/黄）
-blockColors = [1 0 0; 0 0.45 0.95; 1 0.9 0]; % red, blue, yellow
+blockColors = [0 0.45 0.95; 1 0 0; 1 0.9 0]; % red, blue, yellow
 
 % 收集各 block 的 duration
 Dur = cell(1,3);
@@ -296,18 +301,18 @@ for i = blocks
             'Color', blockColors(i,:), 'LineWidth', 2);
     end
 end
-xlabel('Reach Duration T (s)');
+xlabel('Reach Duration (s)');
 ylabel('Density');
-title('Overlapped Duration Histograms with Disappearance Times');
+% title('Overlapped Duration Histograms with Disappear Times');
 grid on;
 
 % 图例：区分直方图与其对应的消失时间
 lgd = legend( ...
     [hH(1) hH(2) hH(3) hV(1) hV(2) hV(3)], ...
-    {'Block 1 durations','Block 2 durations','Block 3 durations', ...
-     sprintf('Block 1 disappear @ %.2fs', Tdisappear(1)), ...
-     sprintf('Block 2 disappear @ %.2fs', Tdisappear(2)), ...
-     sprintf('Block 3 disappear @ %.2fs', Tdisappear(3))}, ...
+    {'Block 1 (short distance)','Block 2 (medium distance)','Block 3 (long distance)', ...
+     sprintf('Block 1 disappear time %.2fs', Tdisappear(1)), ...
+     sprintf('Block 2 disappear time %.2fs', Tdisappear(2)), ...
+     sprintf('Block 3 disappear time %.2fs', Tdisappear(3))}, ...
     'Location','northwest');
 lgd.Box = 'off';
 hold off;
@@ -585,7 +590,7 @@ view(0,90)
 colorbar
 
 
-%% add Countours 加入等高线的residuals图 （version 2） 
+%% add Countours 加入等高线的residuals图 （version 2） 热力图
 errors_predicted = X * coeffs;
 
 % Calculate residuals

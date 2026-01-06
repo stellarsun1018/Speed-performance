@@ -25,7 +25,8 @@
 % 32: target shrinking speed(mm/s)
 
 %%
-clear all
+clear; 
+clc;
 
 participants = {"JHL","JH","LC", "LN", "RC", "SM", "ML", "SX", "SY", "WMZ", "YL", "LL"};
 
@@ -170,7 +171,7 @@ for ip = 1:numel(participants)
     end
 end
 
-%% ====== Plot: 3 subplots, overlay 12 regression lines ======
+%% ====== Plot: 3 subplots, overlay 12 regression lines ====== version 1
 figure('Color','w');
 for b = 1:nBlocks
     subplot(1,3,b); hold on;
@@ -229,6 +230,99 @@ sgtitle("12 subjects: regression lines (speed vs distance) overlaid per block");
 legend('Location','northwest', 'NumColumns', 2);
 
 %%
+%% ====== Plot: 3 subplots, overlay regression lines ====== final version
+figure('Color','w');
+
+blockTitles = { ...
+    'Block 1 (short distances)', ...
+    'Block 2 (medium distances)', ...
+    'Block 3 (long distances)' ...
+};
+
+for b = 1:nBlocks
+    subplot(1,3,b); 
+    hold on;
+
+    x_max = lim_scale * maxDistBlock(b);
+    if x_max <= 0
+        title(blockTitles{b});
+        continue;
+    end
+    x_fit = linspace(0, x_max, 2);
+
+    % --- subject regression lines (all black, solid) ---
+    y_max_fit = 0;
+    firstSubjectPlotted = false;
+
+    for ip = 1:numel(participants)
+        a = fits_speed(b,1,ip);
+        s = fits_speed(b,2,ip);
+        if isnan(a) || isnan(s)
+            continue;
+        end
+
+        y_fit = a + s .* x_fit;
+
+        if ~firstSubjectPlotted
+            plot(x_fit, y_fit, '-', 'LineWidth', 1, ...
+                'Color', 'k', ...
+                'DisplayName', 'Individual linear fits');
+            firstSubjectPlotted = true;
+        else
+            plot(x_fit, y_fit, '-', 'LineWidth', 1, ...
+                'Color', 'k', ...
+                'HandleVisibility', 'off');
+        end
+
+        y_max_fit = max(y_max_fit, max(y_fit));
+    end
+
+    % --- condition lines (use median lifespan across subjects for this block) ---
+    life = median(lifeBlockSubs(b, ~isnan(lifeBlockSubs(b,:))), 'omitnan');
+    if ~isnan(life) && life > 0
+        y_cond = x_fit ./ life;
+        plot(x_fit, y_cond, '--', ...
+            'Color', [0 0.4 0.8], 'LineWidth', 1.5, ...
+            'DisplayName', 'Disappear deadline');
+
+        y_half = x_fit ./ (0.5 * life);
+        plot(x_fit, y_half, '--r', 'LineWidth', 1.5, ...
+            'DisplayName', 'Half-target time');
+    end
+
+    % --- labels & title ---
+    xlabel("Target Distance (mm)");
+    ylabel("Average Speed (mm/s)");
+    title(blockTitles{b});
+
+    % --- axes ---
+    y_max = max([ ...
+        maxSpdBlock(b) * lim_scale, ...
+        y_max_fit, ...
+        exist('y_cond','var')  * max(y_cond) + ~exist('y_cond','var')  * 0, ...
+        exist('y_half','var') * max(y_half) + ~exist('y_half','var') * 0 ...
+    ]);
+
+    if y_max <= 0
+        y_max = 1;
+    end
+
+    xlim([0, x_max]);
+    ylim([0, lim_scale * y_max]);
+
+    grid on;
+
+    % 清理变量，避免影响下一个 block
+    clear y_cond y_half
+end
+
+% --- global title & legend ---
+
+legend('Location','northeast');
+
+%%
+%%
+clear all
 % participant = 'SX';
 lifespan = [0.6,0.6*3^(0.25),0.6*3^(0.5)]; %[1.0,0.6,0.8,0.4]; %[1.1,0.9,1.0,0.8,0.6,0.7] 设定各blocks中target的不同时长  %lifespan控制了受试者实际可用的、逐渐减少的目标"可见e时间窗，这一时间越短，任务难度越高（因为受试者必须更快速地完成任务以取得更高分数）。
 for i = 1:3
@@ -338,8 +432,8 @@ for ip = 1:numel(participants)
         avg_speed = copy(block_ind==1,22);
         duration = copy(block_ind==1,16);
 
-        % plot(distances,duration,'o');
-        % hold on
+        plot(distances,duration,'o');
+        hold on
 
         mdl = fitlm(distances,avg_speed);
         linear_fits(1 + cond_ind * 4,ip) = mdl.Coefficients.Estimate(1);
@@ -452,5 +546,7 @@ title("Duration vs Distance")
 legend("Block 1", "Block 2", "Block 3")
 
 
+% delete 
+figure
 
 
