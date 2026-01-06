@@ -42,6 +42,7 @@ pixellength = 0.248;
 
 colors = lines(part_n);
 
+ip_all = NaN(part_n,720);
 %% ====== Loop subjects: load -> preprocess -> fit ======
 for ip = 1:part_n
     part = participants{ip};
@@ -129,89 +130,94 @@ for ip = 1:part_n
     copy(:,33) = angle_error_in_radian;
     copy(:,34) = rad2deg(angle_error_in_radian);
 
-    % ====== Fit per participant: speed vs distance ======
-    reach_distances = copy(:,21);
-    avg_speed = copy(:,22);
-    gain_errors = copy(:,23);
-    dir_erros = copy(:,29);
+    if sum(copy(:,3) == 0)
+        lifespan = [0.6,0.6*3^(0.25),0.6*3^(0.5)]; %[1.0,0.6,0.8,0.4]; %[1.1,0.9,1.0,0.8,0.6,0.7] 设定各blocks中target的不同时长  %lifespan控制了受试者实际可用的、逐渐减少的目标"可见e时间窗，这一时间越短，任务难度越高（因为受试者必须更快速地完成任务以取得更高分数）。
+        for i = 1:3
+            copy((1+(i-1)*240):(i*240),3) = lifespan(i);
+        end
+    end
 
-    % Prepare the design matrix (adding a column of ones for intercept)
-    X = [ones(size(reach_distances)), reach_distances, avg_speed];
 
-    % Perform multivariate linear regression
-    [coeffs, ~] = regress(gain_errors, X);
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    distances = copy(:,10);
+    durations = copy(:,16);
+    end_size = copy(:,15) .* durations ./ copy(:,3);
 
-    errors_predicted = X * coeffs;
-    residuals = gain_errors - errors_predicted;
-
-    nbin_dist  = 8;
-    nbin_speed = 8;
-
-    figure
-
-    subplot(2,2,1)
-    scatter(reach_distances,residuals,10,'filled')
-    xlabel('Reach distance'); ylabel('Residuals'); yline(0,'--')
-
-    subplot(2,2,2)
-    scatter(avg_speed,residuals,10,'filled')
-    xlabel('Average speed'); ylabel('Residuals'); yline(0,'--')
-
-    subplot(2,2,3)
-    edges = linspace(min(reach_distances), max(reach_distances), nbin_dist+1);
-    binID = discretize(reach_distances, edges);
-    binCenters = (edges(1:end-1) + edges(2:end)) / 2;
-    std_dist = accumarray(binID, residuals, [nbin_dist 1], @std, NaN);
-    plot(binCenters, std_dist, 'o-')
-    xlabel('Reach distance'); ylabel('S.D. of residuals')
-
-    subplot(2,2,4)
-    edges = linspace(min(avg_speed), max(avg_speed), nbin_speed+1);
-    binID = discretize(avg_speed, edges);
-    binCenters = (edges(1:end-1) + edges(2:end)) / 2;
-    std_speed = accumarray(binID, residuals, [nbin_speed 1], @std, NaN);
-    plot(binCenters, std_speed, 'o-')
-    xlabel('Average speed'); ylabel('S.D. of residuals')
-
-    saveas(gcf,fullfile('results', 'plots', 'fig5',sprintf('gain_%s.png', part)));
-    close all
-
-    % Perform multivariate linear regression
-    [coeffs, ~] = regress(dir_errors, X);
-
-    errors_predicted = X * coeffs;
-    residuals = dir_errors - errors_predicted;
-
-    nbin_dist  = 8;
-    nbin_speed = 8;
-
-    figure
-
-    subplot(2,2,1)
-    scatter(reach_distances,residuals,10,'filled')
-    xlabel('Reach distance'); ylabel('Residuals'); yline(0,'--')
-
-    subplot(2,2,2)
-    scatter(avg_speed,residuals,10,'filled')
-    xlabel('Average speed'); ylabel('Residuals'); yline(0,'--')
-
-    subplot(2,2,3)
-    edges = linspace(min(reach_distances), max(reach_distances), nbin_dist+1);
-    binID = discretize(reach_distances, edges);
-    binCenters = (edges(1:end-1) + edges(2:end)) / 2;
-    std_dist = accumarray(binID, residuals, [nbin_dist 1], @std, NaN);
-    plot(binCenters, std_dist, 'o-')
-    xlabel('Reach distance'); ylabel('S.D. of residuals')
-
-    subplot(2,2,4)
-    edges = linspace(min(avg_speed), max(avg_speed), nbin_speed+1);
-    binID = discretize(avg_speed, edges);
-    binCenters = (edges(1:end-1) + edges(2:end)) / 2;
-    std_speed = accumarray(binID, residuals, [nbin_speed 1], @std, NaN);
-    plot(binCenters, std_speed, 'o-')
-    xlabel('Average speed'); ylabel('S.D. of residuals')
-
-    saveas(gcf,fullfile('results', 'plots', 'fig5',sprintf('dir_%s.png', part)));
-    close all
+    id_all = log2( 2 .* distances ./ end_size);
+    ip_all(ip,:) = id_all ./ durations;
 end
+
+%%
+
+ip_mean = mean(ip_all,2);
+ip_sem = std(ip_all,[],2)./ sqrt(size(ip_all,2));
+
+
+errorbar(ip_mean,ip_sem,'o','MarkerFaceColor','auto')
+xticks(1:part_n)
+xticklabels(participants)
+xlim([0,part_n+1])
+xlabel('Participants')
+ylabel('Index of Performance')
+
+saveas(gcf,fullfile('results','plots','fig6', 'errobars.png'))
+
+%% Across Distances
+for ip = 1:part_n
+    part = participants{ip};
+
+    fname_preamble = sprintf('data_onlineConf/usable/%s_sptatialTemporalCostFunc*.mat', part);
+    for k = 1:numel(files)
+        f = fullfile(files(k).folder, files(k).name);
+        load(f);
+    end
+    subplot(3,4,ip)
+    scatter(copy(:,10),ip_all(ip,:),10,'filled')
+    title(part)
+    if mod(ip,4) == 1
+        ylabel('Index pf Performance')
+    end
+
+    if ip >= 9
+        xlabel('Distances (mm)')
+    end
+
+    xlim([65,340])
+    ylim([0,37])
+
+    clear copy
+
+end
+
+saveas(gcf,fullfile('results','plots','fig6', 'across_dist.png'))
+
+
+%% Across Speeds
+for ip = 1:part_n
+    part = participants{ip};
+
+    fname_preamble = sprintf('data_onlineConf/usable/%s_sptatialTemporalCostFunc*.mat', part);
+    for k = 1:numel(files)
+        f = fullfile(files(k).folder, files(k).name);
+        load(f);
+    end
+    subplot(3,4,ip)
+    scatter(copy(:,22),ip_all(ip,:),10,'filled')
+    title(part)
+    if mod(ip,4) == 1
+        ylabel('Index pf Performance')
+    end
+
+    if ip >= 9
+        xlabel('Speed (mm/s)')
+    end
+
+    xlim([130,630])
+    ylim([0,37])
+
+    clear copy
+
+end
+
+saveas(gcf,fullfile('results','plots','fig6', 'across_speed.png'))
 
