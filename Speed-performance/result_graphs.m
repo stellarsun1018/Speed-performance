@@ -159,14 +159,6 @@ for i = 1:3
 end
 
 % sgtitle("Arriving earlier for shorter distances and later for longer distances")
-% 要改颜色
-% assert(size(copy,1) >= 3*240, '预期每个block约240 trial，请确认数据尺寸。');
-% 
-% trialsPerBlock = 240;
-% blocks = 1:3;
-% 
-% % 颜色（与要求一致：红/蓝/黄）
-% blockColors = [1 0 0; 0 0.45 0.95; 1 0.9 0]; % red, blue, yellow
 
 %%
 %% 3 blocks - conditions graphs DURATION
@@ -247,12 +239,12 @@ ylabel('Average Speed (mm/s)');
 % title('Distance vs Speed (3 Blocks)');
 
 % 用回归线句柄生成 legend（不是散点）
-h_fit_legend = plot(nan, nan, 'k-', 'LineWidth', 2); % dummy line for legend
+h_fit_legend = plot(nan, nan, 'k-', 'LineWidth', 1); % dummy line for legend
 
 legend([h_scatter(1), h_scatter(2), h_scatter(3), h_fit_legend], ...
-       {'Block 1 (fast shrinking)', ...
-        'Block 2 (medium shrinking)', ...
-        'Block 3 (slow shrinking)', ...
+       {'Block 1 (short distance)', ...
+        'Block 2 (medium distance)', ...
+        'Block 3 (long distance)', ...
         'Regression fit lines'}, ...
        'Location', 'northwest');
 
