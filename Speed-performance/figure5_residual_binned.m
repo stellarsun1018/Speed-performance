@@ -133,7 +133,7 @@ for ip = 1:part_n
     reach_distances = copy(:,21);
     avg_speed = copy(:,22);
     gain_errors = copy(:,23);
-    dir_erros = copy(:,29);
+    dir_errors = copy(:,29);
 
     % Prepare the design matrix (adding a column of ones for intercept)
     X = [ones(size(reach_distances)), reach_distances, avg_speed];
