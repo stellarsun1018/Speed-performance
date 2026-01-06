@@ -28,7 +28,7 @@
 clear all
 
 participants = {"JHL","JH","LC", "LN", "RC", "SM", "ML", "SX", "SY", "WMZ", "YL", "LL"};
-
+part_n = numel(participants);
 % 如果你想按 session 读（像你上面 SX 那样），就用这一段 pattern：
 use_session = false;   % true: 用 S%d 方式；false: 用 usable 方式
 session = 3;
@@ -39,14 +39,19 @@ lim_scale = 1.2;
 
 pixellength = 0.248;
 
-colors = lines(numel(participants));
+colors = lines(part_n);
 
-beta_0 = NaN(3,numel(participants));
-beta_dist = NaN(3,numel(participants));
-beta_spd = NaN(3,numel(participants));
+beta_gain_0 = NaN(3,part_n);
+beta_gain_dist = NaN(3,part_n);
+beta_gain_spd = NaN(3,part_n);
+
+beta_dir_0 = NaN(3,part_n);
+beta_dir_dist = NaN(3,part_n);
+beta_dir_spd = NaN(3,part_n);
+
 
 %% ====== Loop subjects: load -> preprocess -> fit ======
-for ip = 1:numel(participants)
+for ip = 1:part_n
     part = participants{ip};
 
     % --- find files ---
@@ -135,33 +140,39 @@ for ip = 1:numel(participants)
     % ====== Fit per participant: speed vs distance ======
     reach_distances = copy(:,21);
     avg_speed = copy(:,22);
-    Reach_errors = copy(:,23);
+    gain_errors = copy(:,23);
+    dir_errors = copy(:,29);
 
     
     % Prepare the design matrix (adding a column of ones for intercept)
     X = [ones(size(reach_distances)), reach_distances, avg_speed];
 
     % Perform multivariate linear regression
-    [coeffs, bInt] = regress(Reach_errors, X);
+    [coeffs, bInt] = regress(gain_errors, X);
 
-    beta_0(:,ip) = [coeffs(1);bInt(1,:)'];
-    beta_dist(:,ip) = [coeffs(2);bInt(2,:)'];
-    beta_spd(:,ip) = [coeffs(3);bInt(3,:)'];
+    beta_gain_0(:,ip) = [coeffs(1);bInt(1,:)'];
+    beta_gain_dist(:,ip) = [coeffs(2);bInt(2,:)'];
+    beta_gain_spd(:,ip) = [coeffs(3);bInt(3,:)'];
     
+    [coeffs, bInt] = regress(dir_errors, X);
+
+    beta_dir_0(:,ip) = [coeffs(1);bInt(1,:)'];
+    beta_dir_dist(:,ip) = [coeffs(2);bInt(2,:)'];
+    beta_dir_spd(:,ip) = [coeffs(3);bInt(3,:)'];
 
 end
 
-%%
+%% Gain V1
 figure 
 
-idx = 1:numel(participants);
+idx = 1:part_n;
 
-x0    = linspace(-0.5,  0.6, n); 
-xdist = linspace(-0.5,  0.6, n); 
-xspd  = linspace(1,  2.1, n); 
+x0    = linspace(-0.5,  0.6, part_n); 
+xdist = linspace(-0.5,  0.6, part_n); 
+xspd  = linspace(1,  2.1, part_n); 
 
 subplot(1,2,1)
-errorbar(x0,beta_0(1,:),beta_0(2,:),beta_0(3,:),'o','MarkerFaceColor','auto','LineWidth',1);
+errorbar(x0,beta_gain_0(1,:),beta_gain_0(2,:),beta_gain_0(3,:),'o','MarkerFaceColor','auto','LineWidth',1);
 
 yline(0,'--');
 xlim([x0(1)-0.1,x0(end)+0.1])
@@ -175,9 +186,9 @@ box off
 
 
 subplot(1,2,2)
-errorbar(xdist, beta_dist(1,:), beta_dist(2,:), beta_dist(3,:),'o','MarkerFaceColor','auto','LineWidth',1);
+errorbar(xdist, beta_gain_dist(1,:), beta_gain_dist(2,:), beta_gain_dist(3,:),'o','MarkerFaceColor','auto','LineWidth',1);
 hold on
-errorbar(xspd,  beta_spd(1,:),  beta_spd(2,:),  beta_spd(3,:),'o','MarkerFaceColor','auto','LineWidth',1); 
+errorbar(xspd,  beta_gain_spd(1,:),  beta_gain_spd(2,:),  beta_gain_spd(3,:),'o','MarkerFaceColor','auto','LineWidth',1); 
 hold off
 
 yline(0,'--');
@@ -189,14 +200,14 @@ xlabel('Factor');
 ylabel('Slope');
 legend({'\beta_{distance}','\beta_{speed}'}, 'Location','northeast');
 box off
-
-%%
+saveas(gcf,fullfile('results', 'plots', 'fig4','beta_gain_v1.png'));
+%% Gain V2
 figure
-xdist = linspace(-0.25,  43.75, n); 
-xspd  = linspace(0.25,  44.25, n); 
-errorbar(xdist, beta_dist(1,:), beta_dist(2,:), beta_dist(3,:),'o','MarkerFaceColor','auto','LineWidth',1);
+xdist = linspace(-0.25,  43.75, part_n); 
+xspd  = linspace(0.25,  44.25, part_n); 
+errorbar(xdist, beta_gain_dist(1,:), beta_gain_dist(2,:), beta_gain_dist(3,:),'o','MarkerFaceColor','auto','LineWidth',1);
 hold on
-errorbar(xspd,  beta_spd(1,:),  beta_spd(2,:),  beta_spd(3,:),'o','MarkerFaceColor','auto','LineWidth',1); 
+errorbar(xspd,  beta_gain_spd(1,:),  beta_gain_spd(2,:),  beta_gain_spd(3,:),'o','MarkerFaceColor','auto','LineWidth',1); 
 hold off
 
 yline(0,'--');
@@ -211,3 +222,66 @@ legend({'\beta_{distance}','\beta_{speed}'}, 'Location','northeast');
 box off
 hold off
 
+saveas(gcf,fullfile('results', 'plots', 'fig4','beta_gain_v2.png'));
+
+%% Direction V1
+figure 
+
+idx = 1:part_n;
+
+x0    = linspace(-0.5,  0.6, part_n); 
+xdist = linspace(-0.5,  0.6, part_n); 
+xspd  = linspace(1,  2.1, part_n); 
+
+subplot(1,2,1)
+errorbar(x0,beta_dir_0(1,:),beta_dir_0(2,:),beta_dir_0(3,:),'o','MarkerFaceColor','auto','LineWidth',1);
+
+yline(0,'--');
+xlim([x0(1)-0.1,x0(end)+0.1])
+ylim([-25,25])
+xticks(x0)
+xticklabels(participants)
+legend({'Intercept'}, 'Location','northeast');
+xlabel('Participant');
+ylabel('Intercept');
+box off
+
+
+subplot(1,2,2)
+errorbar(xdist, beta_dir_dist(1,:), beta_dir_dist(2,:), beta_dir_dist(3,:),'o','MarkerFaceColor','auto','LineWidth',1);
+hold on
+errorbar(xspd,  beta_dir_spd(1,:),  beta_dir_spd(2,:),  beta_dir_spd(3,:),'o','MarkerFaceColor','auto','LineWidth',1); 
+hold off
+
+yline(0,'--');
+xlim([xdist(1)-0.2,xspd(end)+0.2])
+ylim([-0.2,0.2])
+xticks([mean(xdist),mean(xspd)])
+xticklabels(["Distance","Speed"])
+xlabel('Factor');
+ylabel('Slope');
+legend({'\beta_{distance}','\beta_{speed}'}, 'Location','northeast');
+box off
+saveas(gcf,fullfile('results', 'plots', 'fig4','beta_dir_v1.png'));
+%% Direction V2
+figure
+xdist = linspace(-0.25,  43.75, part_n); 
+xspd  = linspace(0.25,  44.25, part_n); 
+errorbar(xdist, beta_dir_dist(1,:), beta_dir_dist(2,:), beta_dir_dist(3,:),'o','MarkerFaceColor','auto','LineWidth',1);
+hold on
+errorbar(xspd,  beta_dir_spd(1,:),  beta_dir_spd(2,:),  beta_dir_spd(3,:),'o','MarkerFaceColor','auto','LineWidth',1); 
+hold off
+
+yline(0,'--');
+xlim([xspd(1)-2,xspd(end)+2])
+ylim([-0.2,0.2])
+
+xticks(mean([xdist;xspd]))
+xticklabels(participants)
+xlabel('Participant');
+ylabel('Slope');
+legend({'\beta_{distance}','\beta_{speed}'}, 'Location','northeast');
+box off
+hold off
+
+saveas(gcf,fullfile('results', 'plots', 'fig4','beta_dir_v2.png'));

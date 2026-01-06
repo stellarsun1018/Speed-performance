@@ -131,16 +131,17 @@ for ip = 1:numel(participants)
     % ====== Fit per participant: speed vs distance ======
     reach_distances = copy(:,21);
     avg_speed = copy(:,22);
-    Reach_errors = copy(:,23);
+    gain_errors = copy(:,23);
+    dir_erros = copy(:,29);
 
     % Prepare the design matrix (adding a column of ones for intercept)
     X = [ones(size(reach_distances)), reach_distances, avg_speed];
 
     % Perform multivariate linear regression
-    [coeffs, bInt] = regress(Reach_errors, X);
+    [coeffs, ~] = regress(gain_errors, X);
 
     errors_predicted = X * coeffs;
-    residuals = Reach_errors - errors_predicted;
+    residuals = gain_errors - errors_predicted;
 
     nbin_dist  = 8;
     nbin_speed = 8;
@@ -171,11 +172,47 @@ for ip = 1:numel(participants)
     plot(binCenters, std_speed, 'o-')
     xlabel('Average speed'); ylabel('S.D. of residuals')
 
-    saveas(gcf,fullfile('results', 'plots', 'fig5',sprintf('%s.png', part)));
+    saveas(gcf,fullfile('results', 'plots', 'fig5',sprintf('gain_%s.png', part)));
+    close all
+
+    % Perform multivariate linear regression
+    [coeffs, ~] = regress(dir_errors, X);
+
+    errors_predicted = X * coeffs;
+    residuals = dir_errors - errors_predicted;
+
+    nbin_dist  = 8;
+    nbin_speed = 8;
+
+    figure
+
+    subplot(2,2,1)
+    scatter(reach_distances,residuals,10,'filled')
+    xlabel('Reach distance'); ylabel('Residuals'); yline(0,'--')
+
+    subplot(2,2,2)
+    scatter(avg_speed,residuals,10,'filled')
+    xlabel('Average speed'); ylabel('Residuals'); yline(0,'--')
+
+    subplot(2,2,3)
+    edges = linspace(min(reach_distances), max(reach_distances), nbin_dist+1);
+    binID = discretize(reach_distances, edges);
+    binCenters = (edges(1:end-1) + edges(2:end)) / 2;
+    std_dist = accumarray(binID, residuals, [nbin_dist 1], @std, NaN);
+    plot(binCenters, std_dist, 'o-')
+    xlabel('Reach distance'); ylabel('S.D. of residuals')
+
+    subplot(2,2,4)
+    edges = linspace(min(avg_speed), max(avg_speed), nbin_speed+1);
+    binID = discretize(avg_speed, edges);
+    binCenters = (edges(1:end-1) + edges(2:end)) / 2;
+    std_speed = accumarray(binID, residuals, [nbin_speed 1], @std, NaN);
+    plot(binCenters, std_speed, 'o-')
+    xlabel('Average speed'); ylabel('S.D. of residuals')
+
+    saveas(gcf,fullfile('results', 'plots', 'fig5',sprintf('dir_%s.png', part)));
+    close all
+
 
 end
 
-%%
-figure
-
-saveas(gcf,fullfile('results', 'plots', 'fig5',sprintf('%s.png', part)));
