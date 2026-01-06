@@ -152,7 +152,7 @@ end
 ip_mean = mean(ip_all,2);
 ip_sem = std(ip_all,[],2)./ sqrt(size(ip_all,2));
 
-
+figure
 errorbar(ip_mean,ip_sem,'o','MarkerFaceColor','auto')
 xticks(1:part_n)
 xticklabels(participants)
@@ -163,6 +163,7 @@ ylabel('Index of Performance')
 saveas(gcf,fullfile('results','plots','fig6', 'errobars.png'))
 
 %% Across Distances
+figure
 for ip = 1:part_n
     part = participants{ip};
 
@@ -193,6 +194,7 @@ saveas(gcf,fullfile('results','plots','fig6', 'across_dist.png'))
 
 
 %% Across Speeds
+figure
 for ip = 1:part_n
     part = participants{ip};
 
