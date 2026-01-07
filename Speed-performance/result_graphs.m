@@ -801,7 +801,7 @@ fprintf('Average speed coefficient: %.4f\n', coeffs(3));
 
 % 3D scatter plot of the original data
 figure;
-plot3(reach_distances, avg_speed, Reach_errors, 'o');
+h_data = plot3(reach_distances, avg_speed, Reach_errors, 'o');
 hold on;
 
 xlim([0 max(reach_distances)]);
@@ -815,11 +815,12 @@ ylim([0 max(avg_speed)]);
 error_fit = coeffs(1) + coeffs(2)*dist_grid + coeffs(3)*speed_grid;
 
 % Plot regression plane
-mesh(dist_grid, speed_grid, error_fit);
+h_plane = mesh(dist_grid, speed_grid, error_fit);
 xlabel('Reach Distance (mm)');
 ylabel('Average Speed (mm/s)');
 zlabel('Gain Error (mm)');
-title('Multivariate Linear Regression: Gain Error ~ Reach Distance + Speed');
+legend([h_data, h_plane], {'Data', 'Regression plane'}, 'Location', 'northeast');
+% title('Multivariate Linear Regression: Gain Error ~ Reach Distance + Speed');
 grid on;
 hold off;
 
@@ -860,7 +861,7 @@ fprintf('Ave speed coefficient: %.4f\n', coeffs(3));
 
 % 3D scatter plot of the original data
 figure;
-plot3(reach_distances, avg_speed, Orth_errors, 'o');
+h_data = plot3(reach_distances, avg_speed, Orth_errors, 'o');  % <-- 新增：保存 data 的 handle
 hold on;
 
 xlim([0 max(reach_distances)]);
@@ -874,11 +875,12 @@ ylim([0 max(avg_speed)]);
 error_fit = coeffs(1) + coeffs(2)*dist_grid + coeffs(3)*speed_grid;
 
 % Plot regression plane
-mesh(dist_grid, speed_grid, error_fit);
+h_plane = mesh(dist_grid, speed_grid, error_fit);  % <-- 新增：保存 plane 的 handle
 xlabel('Reach Distance (mm)');
-ylabel(''Average Speed (mm/s)'');
+ylabel('Average Speed (mm/s)');
 zlabel('Orthognal Error (mm)');
-title('Multivariate Linear Regression: Orthognal Error ~ Reach Distance + Speed');
+legend([h_data, h_plane], {'Data', 'Regression plane'}, 'Location', 'northeast');
+% title('Multivariate Linear Regression: Orthognal Error ~ Reach Distance + Speed');
 grid on;
 hold off;
 
