@@ -27,7 +27,7 @@
 %% Load Data
 clear all
 close all
-participant = 'JH';
+participant = 'LL';
 fname_preamble = sprintf('data_onlineConf/usable/%s_sptatialTemporalCostFunc*.mat',participant);
 files = dir(fname_preamble);
 for k = 1:numel(files)
@@ -606,71 +606,91 @@ for col = 1:column_num
 end
 
 sgtitle(['Participant ' participant ' Ideal Observer'])
-% saveas(gcf, fullfile('fitts', ['Participant_' participant '_Ideal_Observer.png']));
-
+saveas(gcf, fullfile('fitts_plots', ['Participant_' participant '_Ideal_Observer.png']));
+close all
 %%
+%% New Plots: Per-Trial p(hit) and Optimal Duration Analysis
+% Compute p(hit) and optimal duration for each trial using the fitted model
 
-%%
-% step_n = 1000;
-% smooth_dur = linspace(min(durations),max(durations),step_n);
-%
-% column_num = 2;
-%
-% figure
-% for i = 1:length(target_live_spans)
-%     plot_idx = i-1;
-%
-%     subplot(length(target_live_spans),column_num,plot_idx * column_num + 1)
-%
-%     dist_sub_selection = distances(life_span_keys(i,:) == 1);
-%     dur_sub_selection = durations(life_span_keys(i,:) == 1);
-%
-%     [x,y] = meshgrid(dist_sub_selection,smooth_dur);
-%     trial_gain_std = fun_std(phi_hat(1:2),x,y);
-%     trial_dir_std = fun_std(phi_hat(3:4),x,y);
-%
-%     tar_size_array = get_tar_size(y,target_live_spans(i),tar_size,x);
-%     current_size_map = tar_size_array;
-%     current_phit_map = p_hit2d(tar_size_array,trial_gain_std,trial_dir_std);
-%     [~,max_phit_dur_ind] = max(current_phit_map,[],1);
-%     max_phit_dur = smooth_dur(max_phit_dur_ind);
-%
-%     scatter(max_phit_dur,dur_sub_selection','filled');
-%
-%     if i == length(target_live_spans)
-%         xlabel('Distance')
-%     elseif i == 1
-%         title('P(hit)')
-%     end
-%
-%     axis xy
-%
-%     % subplot(length(target_live_spans),column_num,plot_idx * column_num + 2)
-%     % current_egain_map = exp_gain_maps{i};
-%     % imagesc(current_egain_map)
-%     % hold on
-%     % contour(1:step_n, 1:step_n, current_egain_map, 'LineColor', 'k', 'LineWidth', 1);
-%     % plot((distances(life_span_keys(i,:) == 1)-min(distances))./zoom_dist, ...
-%     %     (durations(life_span_keys(i,:) == 1)-min(durations))./zoom_dur,'k.')
-%     % hold off
-%     %
-%     % if i == length(target_live_spans)
-%     %     xlabel('Distance')
-%     % elseif i == 1
-%     %     title('Expected Gain')
-%     % end
-%     %
-%     % xticks(linspace(1, step_n, 5));
-%     % xticklabels(round(linspace(min(smooth_dist), max(smooth_dist), 5), 0));
-%     % yticks(linspace(1, step_n, 5));
-%     % yticklabels(round(linspace(min(smooth_dur), max(smooth_dur), 5), 2));
-%     % if plot_colorbar; colorbar; end
-%     % axis xy
-%
-% end
-% sgtitle(['Participant ' participant ' Ideal Observer'])
+p_hits = NaN(size(distances));
+optimal_durs = NaN(size(distances));
 
-% saveas(gcf, fullfile('fitts', ['Participant_' participant '_Ideal_Observer.png']));
+for blk = 1:length(target_live_spans)
+    idx_trials = life_span_keys(blk, :);  % Logical mask for this lifespan block
+    lifespan = target_live_spans(blk);
+    
+    for t = find(idx_trials)
+        dist_t = distances(t);
+        dur_t = durations(t);
+        
+        % Compute std devs for this trial
+        sg_t = fun_std(phi_hat(1:2), dist_t, dur_t);
+        sd_t = fun_std(phi_hat(3:4), dist_t, dur_t);
+        
+        % Compute terminal target size for this trial
+        term_size_t = tar_size * max((1 - dur_t / lifespan), 0);
+        
+        % Compute p(hit) for this trial
+        p_hits(t) = p_hit2d(term_size_t, sg_t, sd_t);
+        
+        % Find optimal duration: Use precomputed exp_gain map for this block
+        % Column index corresponding to dist_t
+        col_idx = round((dist_t - min(smooth_dist)) / zoom_dist) + 1;
+        col_idx = max(1, min(step_n, col_idx));  % Clamp to valid range
+        
+        % EG profile over durations for this dist (rows = dur indices)
+        eg_profile = exp_gain_maps{blk}(:, col_idx);
+        
+        % Find duration index that maximizes EG
+        [~, max_row_idx] = max(eg_profile);
+        
+        % Corresponding optimal duration
+        optimal_durs(t) = smooth_dur(max_row_idx);
+    end
+end
 
-%%
+% Plot 1: p(hit) vs Distance (colored by lifespan block)
+figure('Name', 'Per-Trial p(hit) and Optimal Duration');
+colors = lines(length(target_live_spans));  % Color palette for blocks
 
+subplot(1, 2, 1);
+hold on;
+for blk = 1:length(target_live_spans)
+    idx_trials = life_span_keys(blk, :) == 1;
+    scatter(distances(idx_trials), p_hits(idx_trials), 50, colors(blk, :), 'filled', 'MarkerFaceAlpha', 0.7);
+end
+xlabel('Distance (mm)');
+ylabel('Predicted P(hit)');
+% title('Predicted P(hit) vs Distance');
+ylim([0,1])
+legend('Fast','Medium','Slow','Location', 'northeast');
+grid on;
+hold off;
+
+% Plot 2: Actual Duration vs Optimal Duration for Max Expected Gain (colored by lifespan block)
+subplot(1, 2, 2);
+hold on;
+for blk = 1:length(target_live_spans)
+    idx_trials = life_span_keys(blk, :) == 1;
+    scatter(durations(idx_trials), optimal_durs(idx_trials), 50, colors(blk, :), 'filled', 'MarkerFaceAlpha', 0.7);
+end
+xlabel('Actual Duration (s)');
+ylabel('Optimal Duration (s)');
+xlim([0.1,0.9])
+ylim([0.1,0.9])
+% title('Actual vs Optimal Duration for Max Expected Gain');
+% Add reference line (y = x)
+refline(1, 0);
+% refline('Color', [0.5 0.5 0.5], 'LineStyle', '--');
+legend('Fast','Medium','Slow','Location', 'northeast');
+
+
+grid on;
+hold off;
+
+
+sgtitle(sprintf('Participant %s: Per-Trial Predictions', participant));
+
+% Optional: Save the figure
+saveas(gcf, fullfile('fitts_plots', sprintf('Participant_%s_PerTrial_Predictions.png', participant)));
+close all
