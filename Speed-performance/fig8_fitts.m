@@ -112,20 +112,6 @@ dir_error = dir_error - dir_bias_offset;
 
 
 %%
-function Sigma = local_cov_pred(stdF, phi, dist, dur)
-sig_gain = stdF(phi(1:2), dist, dur);      % σ_g in linear scale
-sig_dir = stdF(phi(3:4), dist, dur);      % σ_d in linear scale
-rho = phi(5);                        % static correlation ρ
-
-if isscalar(sig_gain) && isscalar(sig_dir)
-    Sigma = [sig_gain.^2, rho*sig_gain*sig_dir; rho*sig_gain*sig_dir, sig_dir.^2];
-else
-    n = numel(sig_gain);
-    Sigma = arrayfun(@(i) [sig_gain(i).^2, rho*sig_gain(i)*sig_dir(i); ...
-        rho*sig_gain(i)*sig_dir(i), sig_dir(i).^2], ...
-        (1:n)', 'UniformOutput', false);
-end
-end
 
 fun_std = @(theta,dist,dur) 2.^(log2(dist * 2) - (theta(1) .* dur)) .* theta(2) + 2;
 
@@ -203,129 +189,12 @@ score_per_hit = @(term_size,tar_size,max_score) max_score .* max((term_size ./ t
 p_hit = @(term_size,sigma) normcdf(term_size, 0, sigma) - normcdf(-term_size, 0, sigma);
 exp_gain = @(term_size,sigma) p_hit(term_size,sigma) .* score_per_hit(term_size,tar_size,10);
 %%
-function P = local_p_hit2d_rect(a, sg, sd, rho)
-% Compute P(|G|<=a, |D|<=a) where [G;D] ~ N(0, Sigma), Sigma = [sg^2, rho*sg*sd; rho*sg*sd, sd^2]
-% Vectorized over matching arrays a, sg, sd. Tries mvncdf; if unavailable, falls back to MC.
 
-% basic input checks / broadcasting guard
-if ~isequal(size(a), size(sg)) || ~isequal(size(a), size(sd))
-    error('local_p_hit2d_rect: size mismatch among a, sg, sd.');
-end
-
-% Flatten to 1D for a simple loop, then reshape back
-a_v  = a(:);
-sg_v = sg(:);
-sd_v = sd(:);
-n    = numel(a_v);
-P_v  = nan(n,1);
-
-% Try exact bivariate normal CDF over rectangle with mvncdf
-can_mvncdf = exist('mvncdf','file') == 2;
-
-if can_mvncdf
-    for k = 1:n
-        ak  = a_v(k);
-        sgk = sg_v(k);
-        sdk = sd_v(k);
-        % Guard tiny/zero stds
-        sgk = max(sgk, realmin('double'));
-        sdk = max(sdk, realmin('double'));
-
-        % Lower/Upper bounds and Sigma
-        lo = [-ak, -ak];
-        hi = [ ak,  ak];
-        Sigma = [sgk^2, rho*sgk*sdk; rho*sgk*sdk, sdk^2];
-
-        % mvncdf returns the prob mass in the rectangle
-        P_v(k) = mvncdf(lo, hi, [0 0], Sigma);
-    end
-else
-    % Monte Carlo fallback (fast-ish): independent base normals + correlate via Cholesky
-    % Note: MC per grid point can be costly; keep N moderate.
-    N = 1000;  % adjust if you want smoother estimates vs runtime
-    Z = randn(N, 2);  % reused base samples
-    for k = 1:n
-        ak  = a_v(k);
-        sgk = sg_v(k);
-        sdk = sd_v(k);
-        sgk = max(sgk, realmin('double'));
-        sdk = max(sdk, realmin('double'));
-        Sigma = [sgk^2, rho*sgk*sdk; rho*sgk*sdk, sdk^2];
-
-        % Cholesky (robustify with jitter if needed)
-        [L,p] = chol(Sigma, 'lower');
-        if p>0
-            % add tiny jitter if Sigma is borderline
-            jitter = 1e-12 * max(Sigma(1,1)+Sigma(2,2), 1);
-            [L,~] = chol(Sigma + jitter*eye(2), 'lower');
-        end
-        X = Z * L.';  % N x 2 samples ~ N(0,Sigma)
-        P_v(k) = mean( abs(X(:,1)) <= ak & abs(X(:,2)) <= ak );
-    end
-end
-
-P = reshape(P_v, size(a));
-end
 
 p_hit2d = @(a, sg, sd) local_p_hit2d_rect(a, sg, sd, rho);
 
 %%
-function EG = local_exp_score2d_mc(term_size, sg, sd, rho, tar_size, max_score, N)
-% Monte Carlo expected score per grid cell for the radial scoring rule.
-% Shapes: term_size, sg, sd are identical arrays (e.g., step_n x step_n).
-% tar_size can be scalar or same-sized array. EG has same shape as inputs.
 
-if ~isequal(size(term_size), size(sg)) || ~isequal(size(term_size), size(sd))
-    error('local_exp_score2d_mc: size mismatch among term_size, sg, sd.');
-end
-if ~isscalar(tar_size) && ~isequal(size(tar_size), size(term_size))
-    error('local_exp_score2d_mc: tar_size must be scalar or match term_size size.');
-end
-
-% Vectorize over grid by flattening, then reshape back.
-a_v  = term_size(:);
-sg_v = max(sg(:),  realmin('double'));
-sd_v = max(sd(:),  realmin('double'));
-if isscalar(tar_size)
-    ts_v = repmat(tar_size, numel(a_v), 1);
-else
-    ts_v = tar_size(:);
-end
-n  = numel(a_v);
-EG_v = zeros(n,1);
-
-% Reuse base standard-normal samples for variance reduction & speed.
-if nargin < 7 || isempty(N), N = 2000; end
-Z = randn(N, 2); % N x 2, iid N(0, I)
-
-for k = 1:n
-    ak  = a_v(k);         % term_size (acceptance radius)
-    sgk = sg_v(k);
-    sdk = sd_v(k);
-    tsk = ts_v(k);
-
-    % Build Sigma and its Cholesky
-    Sigma = [sgk^2, rho*sgk*sdk; rho*sgk*sdk, sdk^2];
-    [L,p] = chol(Sigma, 'lower');
-    if p>0
-        jitter = 1e-12 * max(Sigma(1,1)+Sigma(2,2), 1);
-        [L,~] = chol(Sigma + jitter*eye(2), 'lower');
-    end
-
-    % Draw correlated samples ~ N(0, Sigma)
-    X = Z * L.';                 % N x 2
-    r = hypot(X(:,1), X(:,2));   % radial distance
-
-    % Radial, linearly decaying score inside acceptance radius
-    S = max_score * (1 - r./tsk);
-    S(r > ak) = 0;               % zero outside term_size
-    S(S < 0)  = 0;               % clamp if term_size < tar_size, etc.
-
-    EG_v(k) = mean(S);
-end
-
-EG = reshape(EG_v, size(term_size));
-end
 
 
 % MC expected score maps for each lifespan
@@ -464,7 +333,7 @@ end
 %
 % saveas(gcf, fullfile('fitts', ['Participant_' participant '_Ideal_Observer.png']));
 
-%%
+%% % heatmap of p(hit) and Expected(gain)
 column_num = 5;
 plot_colorbar = 1;
 
@@ -606,8 +475,8 @@ for col = 1:column_num
 end
 
 sgtitle(['Participant ' participant ' Ideal Observer'])
-saveas(gcf, fullfile('fitts_plots', ['Participant_' participant '_Ideal_Observer.png']));
-close all
+% saveas(gcf, fullfile('fitts_plots', ['Participant_' participant '_Ideal_Observer.png']));
+% close all
 %%
 %% New Plots: Per-Trial p(hit) and Optimal Duration Analysis
 % Compute p(hit) and optimal duration for each trial using the fitted model
@@ -664,7 +533,7 @@ ylabel('Predicted P(hit)');
 % title('Predicted P(hit) vs Distance');
 ylim([0,1])
 legend('Fast','Medium','Slow','Location', 'northeast');
-grid on;
+grid off;
 hold off;
 
 % Plot 2: Actual Duration vs Optimal Duration for Max Expected Gain (colored by lifespan block)
@@ -677,20 +546,158 @@ end
 xlabel('Actual Duration (s)');
 ylabel('Optimal Duration (s)');
 xlim([0.1,0.9])
+xticks(0.1:0.1:0.9)
 ylim([0.1,0.9])
 % title('Actual vs Optimal Duration for Max Expected Gain');
 % Add reference line (y = x)
-refline(1, 0);
+plot(xlim,ylim,'--k')
 % refline('Color', [0.5 0.5 0.5], 'LineStyle', '--');
 legend('Fast','Medium','Slow','Location', 'northeast');
 
 
-grid on;
+grid off;
 hold off;
 
 
 sgtitle(sprintf('Participant %s: Per-Trial Predictions', participant));
 
 % Optional: Save the figure
-saveas(gcf, fullfile('fitts_plots', sprintf('Participant_%s_PerTrial_Predictions.png', participant)));
-close all
+% saveas(gcf, fullfile('fitts_plots', sprintf('Participant_%s_PerTrial_Predictions.png', participant)));
+% close all
+
+
+function Sigma = local_cov_pred(stdF, phi, dist, dur)
+sig_gain = stdF(phi(1:2), dist, dur);      % σ_g in linear scale
+sig_dir = stdF(phi(3:4), dist, dur);      % σ_d in linear scale
+rho = phi(5);                        % static correlation ρ
+
+if isscalar(sig_gain) && isscalar(sig_dir)
+    Sigma = [sig_gain.^2, rho*sig_gain*sig_dir; rho*sig_gain*sig_dir, sig_dir.^2];
+else
+    n = numel(sig_gain);
+    Sigma = arrayfun(@(i) [sig_gain(i).^2, rho*sig_gain(i)*sig_dir(i); ...
+        rho*sig_gain(i)*sig_dir(i), sig_dir(i).^2], ...
+        (1:n)', 'UniformOutput', false);
+end
+end
+
+function P = local_p_hit2d_rect(a, sg, sd, rho)
+% Compute P(|G|<=a, |D|<=a) where [G;D] ~ N(0, Sigma), Sigma = [sg^2, rho*sg*sd; rho*sg*sd, sd^2]
+% Vectorized over matching arrays a, sg, sd. Tries mvncdf; if unavailable, falls back to MC.
+
+% basic input checks / broadcasting guard
+if ~isequal(size(a), size(sg)) || ~isequal(size(a), size(sd))
+    error('local_p_hit2d_rect: size mismatch among a, sg, sd.');
+end
+
+% Flatten to 1D for a simple loop, then reshape back
+a_v  = a(:);
+sg_v = sg(:);
+sd_v = sd(:);
+n    = numel(a_v);
+P_v  = nan(n,1);
+
+% Try exact bivariate normal CDF over rectangle with mvncdf
+can_mvncdf = exist('mvncdf','file') == 2;
+
+if can_mvncdf
+    for k = 1:n
+        ak  = a_v(k);
+        sgk = sg_v(k);
+        sdk = sd_v(k);
+        % Guard tiny/zero stds
+        sgk = max(sgk, realmin('double'));
+        sdk = max(sdk, realmin('double'));
+
+        % Lower/Upper bounds and Sigma
+        lo = [-ak, -ak];
+        hi = [ ak,  ak];
+        Sigma = [sgk^2, rho*sgk*sdk; rho*sgk*sdk, sdk^2];
+
+        % mvncdf returns the prob mass in the rectangle
+        P_v(k) = mvncdf(lo, hi, [0 0], Sigma);
+    end
+else
+    % Monte Carlo fallback (fast-ish): independent base normals + correlate via Cholesky
+    % Note: MC per grid point can be costly; keep N moderate.
+    N = 1000;  % adjust if you want smoother estimates vs runtime
+    Z = randn(N, 2);  % reused base samples
+    for k = 1:n
+        ak  = a_v(k);
+        sgk = sg_v(k);
+        sdk = sd_v(k);
+        sgk = max(sgk, realmin('double'));
+        sdk = max(sdk, realmin('double'));
+        Sigma = [sgk^2, rho*sgk*sdk; rho*sgk*sdk, sdk^2];
+
+        % Cholesky (robustify with jitter if needed)
+        [L,p] = chol(Sigma, 'lower');
+        if p>0
+            % add tiny jitter if Sigma is borderline
+            jitter = 1e-12 * max(Sigma(1,1)+Sigma(2,2), 1);
+            [L,~] = chol(Sigma + jitter*eye(2), 'lower');
+        end
+        X = Z * L.';  % N x 2 samples ~ N(0,Sigma)
+        P_v(k) = mean( abs(X(:,1)) <= ak & abs(X(:,2)) <= ak );
+    end
+end
+
+P = reshape(P_v, size(a));
+end
+
+function EG = local_exp_score2d_mc(term_size, sg, sd, rho, tar_size, max_score, N)
+% Monte Carlo expected score per grid cell for the radial scoring rule.
+% Shapes: term_size, sg, sd are identical arrays (e.g., step_n x step_n).
+% tar_size can be scalar or same-sized array. EG has same shape as inputs.
+
+if ~isequal(size(term_size), size(sg)) || ~isequal(size(term_size), size(sd))
+    error('local_exp_score2d_mc: size mismatch among term_size, sg, sd.');
+end
+if ~isscalar(tar_size) && ~isequal(size(tar_size), size(term_size))
+    error('local_exp_score2d_mc: tar_size must be scalar or match term_size size.');
+end
+
+% Vectorize over grid by flattening, then reshape back.
+a_v  = term_size(:);
+sg_v = max(sg(:),  realmin('double'));
+sd_v = max(sd(:),  realmin('double'));
+if isscalar(tar_size)
+    ts_v = repmat(tar_size, numel(a_v), 1);
+else
+    ts_v = tar_size(:);
+end
+n  = numel(a_v);
+EG_v = zeros(n,1);
+
+% Reuse base standard-normal samples for variance reduction & speed.
+if nargin < 7 || isempty(N), N = 2000; end
+Z = randn(N, 2); % N x 2, iid N(0, I)
+
+for k = 1:n
+    ak  = a_v(k);         % term_size (acceptance radius)
+    sgk = sg_v(k);
+    sdk = sd_v(k);
+    tsk = ts_v(k);
+
+    % Build Sigma and its Cholesky
+    Sigma = [sgk^2, rho*sgk*sdk; rho*sgk*sdk, sdk^2];
+    [L,p] = chol(Sigma, 'lower');
+    if p>0
+        jitter = 1e-12 * max(Sigma(1,1)+Sigma(2,2), 1);
+        [L,~] = chol(Sigma + jitter*eye(2), 'lower');
+    end
+
+    % Draw correlated samples ~ N(0, Sigma)
+    X = Z * L.';                 % N x 2
+    r = hypot(X(:,1), X(:,2));   % radial distance
+
+    % Radial, linearly decaying score inside acceptance radius
+    S = max_score * (1 - r./tsk);
+    S(r > ak) = 0;               % zero outside term_size
+    S(S < 0)  = 0;               % clamp if term_size < tar_size, etc.
+
+    EG_v(k) = mean(S);
+end
+
+EG = reshape(EG_v, size(term_size));
+end

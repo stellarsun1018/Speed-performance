@@ -250,7 +250,7 @@ legend([h_scatter(1), h_scatter(2), h_scatter(3), h_fit_legend], ...
 
 grid on;
 
-%%  Duration histograms by block (overlapped) + disappearance time lines
+%% ？  Duration histograms by block (overlapped) + disappearance time lines
 % copy(:,16) = duration(s); copy(:,3) = lifespan(s)（每个block恒定）
 
 assert(size(copy,1) >= 3*240, '预期每个block约240 trial，请确认数据尺寸。');
@@ -307,15 +307,38 @@ ylabel('Density');
 grid on;
 
 % 图例：区分直方图与其对应的消失时间
-lgd = legend( ...
-    [hH(1) hH(2) hH(3) hV(1) hV(2) hV(3)], ...
-    {'Block 1 (short distance)','Block 2 (medium distance)','Block 3 (long distance)', ...
-     sprintf('Block 1 disappear time %.2fs', Tdisappear(1)), ...
-     sprintf('Block 2 disappear time %.2fs', Tdisappear(2)), ...
-     sprintf('Block 3 disappear time %.2fs', Tdisappear(3))}, ...
-    'Location','northwest');
-lgd.Box = 'off';
-hold off;
+% lgd = legend( ...
+%     [hH(1) hH(2) hH(3) hV(1) hV(2) hV(3)], ...
+%     {'Block 1 (short distance)','Block 2 (medium distance)','Block 3 (long distance)', ...
+%      sprintf('Block 1 disappear time %.2fs', Tdisappear(1)), ...
+%      sprintf('Block 2 disappear time %.2fs', Tdisappear(2)), ...
+%      sprintf('Block 3 disappear time %.2fs', Tdisappear(3))}, ...
+%     'Location','northwest');
+% lgd.Box = 'off';
+% hold off;
+
+% Example legend-table data
+Time = {'600 ms'; '800 ms'; '1000 ms'};
+Distances = {'100, 120, 140 mm'; '120, 140, 160 mm'; '140, 160, 180 mm'};
+ColorBox = {'■'; '■'; '■'};  % will color the text itself
+
+T = table(ColorBox, Time, Distances);
+
+% Make the plot (dummy example)
+figure; plot(rand(10,3)); hold on
+
+% Put a table in the figure (position is in normalized figure units)
+uit = uitable('Data', T{:,:}, ...
+    'ColumnName', {'Color','Time','Distances'}, ...
+    'Units','normalized', ...
+    'Position',[0.62 0.62 0.35 0.30]);
+
+% Color the "■" cells (HTML works in many MATLAB versions for uitable)
+uit.Data{1,1} = '<html><font color="#0000FF">■</font></html>';
+uit.Data{2,1} = '<html><font color="#FF0000">■</font></html>';
+uit.Data{3,1} = '<html><font color="#FFD400">■</font></html>';
+%%
+
 
 %% Compare mean durations across blocks (bar + errorbars) + print stats
 % !!!!!!!add error bar to this, make alpha = 0.7 or something for it's more
