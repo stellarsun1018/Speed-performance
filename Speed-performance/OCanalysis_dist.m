@@ -985,236 +985,236 @@ grid on;
 
 
 %% 3D plot of Distance vs. Shrinking Speed vs. Avg Error
-
-% 明确定义目标距离区间的范围（修改后的区间）
-distance_bins = [50,150; 150,250; 250,350]; % 三个距离区间 (mm)
-speed_values = [11.6560, 14.5700, 19.4267, 29.1400]; % 四个速度水平 (mm/s)
-
-% 将每个距离区间的中心点用于绘图
-distance_labels = {'100mm','200mm','300mm'};
-distance_centers = [100, 200, 300]; % 中心点分别对应区间中心点
-
-% 创建绘图的网格坐标点
-[X,Y] = meshgrid(speed_values, distance_centers);
-
-% 初始化Z矩阵以存放平均误差
-Z = NaN(size(X));
-
-% 计算每个grid内的平均误差值
-for i = 1:size(distance_bins,1)
-    for j = 1:length(speed_values)
-        
-        % 提取当前bin的数据索引
-        idx = copy(:,10) >= distance_bins(i,1) & copy(:,10) < distance_bins(i,2) & ...
-              abs(copy(:,32) - speed_values(j)) < 0.01;
-        
-        % 计算平均误差大小
-        Z(i,j) = mean(copy(idx,17),'omitnan');
-    end
-end
-
-% 绘制3D曲面图 (平均误差大小)
-figure;
-surf(X,Y,Z);
-% 设置颜色映射和颜色条
-colormap('jet');
-colorbar;
-
-% 设置轴标签和图标题
-xlabel('Target Shrinking Speed (mm/s)','FontSize',12);
-ylabel('Target Distance Bin','FontSize',12);
-zlabel('Average Error Size (mm)','FontSize',12);
-title('3D Surface: Distance Bin vs. Shrinking Speed vs. Avg Error','FontSize',14);
-
-% 调整Y轴刻度标签，便于理解距离区间
-yticks(distance_centers);
-yticklabels(distance_labels);
-
-% 设置网格线和平滑显示
-grid on;
-shading interp; 
-view(-45,30);
-
-% 在每个数据点上标记具体的误差数值
-hold on;
-for i = 1:numel(X)
-    if ~isnan(Z(i))
-        text(X(i), Y(i), Z(i)+0.2, sprintf('%.2f',Z(i)),...
-            'FontSize',10,'FontWeight','bold',...
-            'HorizontalAlignment','center',...
-            'VerticalAlignment','bottom');
-    end
-end
-hold off;
-
-
-%% 3D plot of Distance vs. Shrinking Speed vs. Sd of Error (reach direction)
-
-
-figure;
-
-% 明确定义目标距离区间的范围
-distance_bins = [50,150; 150,250; 250,300]; % 三个距离区间 (mm)
-speed_values = [11.6560, 14.5700, 19.4267, 29.1400]; % 四个速度水平 (mm/s)
-
-% 定义每个距离区间的中心点和标签用于绘图
-distance_centers = [100, 200, 275]; % 中心点 (最后一个区间250-300取275)
-distance_labels = {'50-150mm','150-250mm','250-300mm'};
-
-% 创建绘图网格坐标
-[X,Y] = meshgrid(speed_values, distance_centers);
-
-% 初始化Z矩阵用于存放标准差
-Z_sd_reach_dir = NaN(size(X));
-
-% 计算每个grid内reach方向误差(copy(:,23))的标准差
-for i = 1:size(distance_bins,1)
-    for j = 1:length(speed_values)
-        
-        % 提取当前bin的数据索引
-        idx = copy(:,10) >= distance_bins(i,1) & copy(:,10) < distance_bins(i,2) & ...
-              abs(copy(:,32) - speed_values(j)) < 0.01;  % 注意：这里是copy(:,32)
-        
-        % 计算标准差(Standard Deviation)
-        Z_sd_reach_dir(i,j) = std(copy(idx,23),'omitnan');
-    end
-end
-
-% 绘制3D曲面图 (Standard Deviation of Reach Direction Error)
-surf(X,Y,Z_sd_reach_dir);
-
-% 设置颜色映射和颜色条
-colormap('jet');
-colorbar;
-
-% 设置轴标签和图标题
-xlabel('Target Shrinking Speed (mm/s)','FontSize',12);
-ylabel('Target Distance Bin','FontSize',12);
-zlabel('STD of Error Along Reach Direction (mm)','FontSize',12);
-title('3D Surface: Distance Bin vs. Shrinking Speed vs. STD of Reach Direction Error','FontSize',14);
-
-% 调整Y轴刻度标签
-yticks(distance_centers);
-yticklabels(distance_labels);
-
-% 设置网格线和平滑显示
-grid on;
-shading interp; 
-view(-45,30);
-
-% 在每个数据点上标记具体的标准差数值
-hold on;
-for i = 1:numel(X)
-    if ~isnan(Z_sd_reach_dir(i))
-        text(X(i), Y(i), Z_sd_reach_dir(i)+0.1, sprintf('%.2f',Z_sd_reach_dir(i)),...
-            'FontSize',10,'FontWeight','bold',...
-            'HorizontalAlignment','center',...
-            'VerticalAlignment','bottom');
-    end
-end
-hold off;
-
-%% 3D plot of Distance vs. Shrinking Speed vs. Sd of Error (orthognal)
-
-% 创建新的图窗口（避免覆盖之前的图）
-figure;
-
-% 定义目标距离区间范围
-distance_bins = [50,150; 150,250; 250,300]; % 三个距离区间 (mm)
-speed_values = [11.6560, 14.5700, 19.4267, 29.1400]; % 四个速度水平 (mm/s)
-
-% 定义每个区间的中心点和标签（用于绘图）
-distance_centers = [100, 200, 275]; % 最后一个区间中心取275
-distance_labels = {'50-150mm','150-250mm','250-300mm'};
-
-% 创建绘图网格
-[X,Y] = meshgrid(speed_values, distance_centers);
-
-% 初始化Z矩阵用于存放正交误差标准差
-Z_sd_orthogonal = NaN(size(X));
-
-% 计算每个grid内正交误差(copy(:,29))的标准差
-for i = 1:size(distance_bins,1)
-    for j = 1:length(speed_values)
-        
-        % 提取当前bin的数据索引
-        idx = copy(:,10) >= distance_bins(i,1) & copy(:,10) < distance_bins(i,2) & ...
-              abs(copy(:,32) - speed_values(j)) < 0.01; % 注意使用的是copy(:,32)
-
-        % 计算标准差(Standard Deviation)
-        Z_sd_orthogonal(i,j) = std(copy(idx,29),'omitnan');
-    end
-end
-
-% 绘制3D曲面图 (正交误差标准差)
-surf(X,Y,Z_sd_orthogonal);
-
-% 设置颜色映射和颜色条
-colormap('jet');
-colorbar;
-
-% 设置轴标签和图标题
-xlabel('Target Shrinking Speed (mm/s)','FontSize',12);
-ylabel('Target Distance Bin','FontSize',12);
-zlabel('STD of Orthogonal Error (mm)','FontSize',12);
-title('3D Surface: Distance Bin vs. Shrinking Speed vs. STD of Orthogonal Error','FontSize',14);
-
-% 调整Y轴刻度标签
-yticks(distance_centers);
-yticklabels(distance_labels);
-
-% 设置网格线和平滑显示
-grid on;
-shading interp; 
-view(-45,30);
-
-% 在每个数据点上标记具体的标准差数值
-hold on;
-for i = 1:numel(X)
-    if ~isnan(Z_sd_orthogonal(i))
-        text(X(i), Y(i), Z_sd_orthogonal(i)+0.1, sprintf('%.2f',Z_sd_orthogonal(i)),...
-            'FontSize',10,'FontWeight','bold',...
-            'HorizontalAlignment','center',...
-            'VerticalAlignment','bottom');
-    end
-end
-hold off;
-
-
-%%
-%
-reCenteredTrajX = NaN(size(copy,1),size(validTraX,2));
-reCenteredTrajY = NaN(size(copy,1),size(validTraX,2));
-
-for i = 1:size(copy,1)
-    reCenteredTrajX(i,:) = (validTraX(i,:) - copy(i,8)) .* pixellength;
-    reCenteredTrajY(i,:) = (validTraY(i,:) - copy(i,9)) .* pixellength;
-end
-
-maxDuration = sum((sum(~isnan(reCenteredTrajX),1))~=0);
-traProjection = NaN(size(copy,1),maxDuration);
-for i = 1:maxDuration
-    traProjection(:,i) = (abs(dot([reCenteredTrajX(:,i),reCenteredTrajY(:,i)],copy(:,24:25),2) ./ dot(copy(:,24:25),copy(:,24:25),2))); %逐时间点投影计算
-end
-speedProjection = traProjection(:,2:end) - traProjection(:,1:end-1);
-accProjection = speedProjection(:,2:end) - speedProjection(:,1:end-1); %思考：这个有用吗？
-
-endTime = sum(~isnan(reCenteredTrajX),2); 
-b0 = [1,-1,45];
-bUB = [2,-0.1,100]; % [b(1)上下值，slope, maxspeed x轴值]  % b(1) - 决定 sigmoid 曲线的最大值
-bLB = [0.1,-1.5,0];
-
-sigmoidFit = NaN(3,size(copy,1));
-for i = 1:size(copy,1)
-    x = 1:endTime(i); % x是时间
-    y = traProjection(i,x);  % y是走过的比例 
-    x = 1:sum(y<1.5); % x给了一个限制（限制y要小于1.5倍的距离
-    y = traProjection(i,x); % 在该限制下的y取值
-    fun = @(b) sum(((b(1)./(1+exp(b(2)*(x-b(3)))))-y).^2); %sigmoidFit's formula 
-    % b = bads(fun,b0,bLB,bUB); % lsqnonlin is the funtion of sigmoidFit
-    b = bads(fun,b0,bLB,bUB); % lsqnonlin is the funtion of sigmoidFit
-    sigmoidFit(:,i) = b; % save b(b,a,c,3 parameters) into a table named signoidFit
-end
+% 
+% % 明确定义目标距离区间的范围（修改后的区间）
+% distance_bins = [50,150; 150,250; 250,350]; % 三个距离区间 (mm)
+% speed_values = [11.6560, 14.5700, 19.4267, 29.1400]; % 四个速度水平 (mm/s)
+% 
+% % 将每个距离区间的中心点用于绘图
+% distance_labels = {'100mm','200mm','300mm'};
+% distance_centers = [100, 200, 300]; % 中心点分别对应区间中心点
+% 
+% % 创建绘图的网格坐标点
+% [X,Y] = meshgrid(speed_values, distance_centers);
+% 
+% % 初始化Z矩阵以存放平均误差
+% Z = NaN(size(X));
+% 
+% % 计算每个grid内的平均误差值
+% for i = 1:size(distance_bins,1)
+%     for j = 1:length(speed_values)
+% 
+%         % 提取当前bin的数据索引
+%         idx = copy(:,10) >= distance_bins(i,1) & copy(:,10) < distance_bins(i,2) & ...
+%               abs(copy(:,32) - speed_values(j)) < 0.01;
+% 
+%         % 计算平均误差大小
+%         Z(i,j) = mean(copy(idx,17),'omitnan');
+%     end
+% end
+% 
+% % 绘制3D曲面图 (平均误差大小)
+% figure;
+% surf(X,Y,Z);
+% % 设置颜色映射和颜色条
+% colormap('jet');
+% colorbar;
+% 
+% % 设置轴标签和图标题
+% xlabel('Target Shrinking Speed (mm/s)','FontSize',12);
+% ylabel('Target Distance Bin','FontSize',12);
+% zlabel('Average Error Size (mm)','FontSize',12);
+% title('3D Surface: Distance Bin vs. Shrinking Speed vs. Avg Error','FontSize',14);
+% 
+% % 调整Y轴刻度标签，便于理解距离区间
+% yticks(distance_centers);
+% yticklabels(distance_labels);
+% 
+% % 设置网格线和平滑显示
+% grid on;
+% shading interp; 
+% view(-45,30);
+% 
+% % 在每个数据点上标记具体的误差数值
+% hold on;
+% for i = 1:numel(X)
+%     if ~isnan(Z(i))
+%         text(X(i), Y(i), Z(i)+0.2, sprintf('%.2f',Z(i)),...
+%             'FontSize',10,'FontWeight','bold',...
+%             'HorizontalAlignment','center',...
+%             'VerticalAlignment','bottom');
+%     end
+% end
+% hold off;
+% 
+% 
+% %% 3D plot of Distance vs. Shrinking Speed vs. Sd of Error (reach direction)
+% 
+% 
+% figure;
+% 
+% % 明确定义目标距离区间的范围
+% distance_bins = [50,150; 150,250; 250,300]; % 三个距离区间 (mm)
+% speed_values = [11.6560, 14.5700, 19.4267, 29.1400]; % 四个速度水平 (mm/s)
+% 
+% % 定义每个距离区间的中心点和标签用于绘图
+% distance_centers = [100, 200, 275]; % 中心点 (最后一个区间250-300取275)
+% distance_labels = {'50-150mm','150-250mm','250-300mm'};
+% 
+% % 创建绘图网格坐标
+% [X,Y] = meshgrid(speed_values, distance_centers);
+% 
+% % 初始化Z矩阵用于存放标准差
+% Z_sd_reach_dir = NaN(size(X));
+% 
+% % 计算每个grid内reach方向误差(copy(:,23))的标准差
+% for i = 1:size(distance_bins,1)
+%     for j = 1:length(speed_values)
+% 
+%         % 提取当前bin的数据索引
+%         idx = copy(:,10) >= distance_bins(i,1) & copy(:,10) < distance_bins(i,2) & ...
+%               abs(copy(:,32) - speed_values(j)) < 0.01;  % 注意：这里是copy(:,32)
+% 
+%         % 计算标准差(Standard Deviation)
+%         Z_sd_reach_dir(i,j) = std(copy(idx,23),'omitnan');
+%     end
+% end
+% 
+% % 绘制3D曲面图 (Standard Deviation of Reach Direction Error)
+% surf(X,Y,Z_sd_reach_dir);
+% 
+% % 设置颜色映射和颜色条
+% colormap('jet');
+% colorbar;
+% 
+% % 设置轴标签和图标题
+% xlabel('Target Shrinking Speed (mm/s)','FontSize',12);
+% ylabel('Target Distance Bin','FontSize',12);
+% zlabel('STD of Error Along Reach Direction (mm)','FontSize',12);
+% title('3D Surface: Distance Bin vs. Shrinking Speed vs. STD of Reach Direction Error','FontSize',14);
+% 
+% % 调整Y轴刻度标签
+% yticks(distance_centers);
+% yticklabels(distance_labels);
+% 
+% % 设置网格线和平滑显示
+% grid on;
+% shading interp; 
+% view(-45,30);
+% 
+% % 在每个数据点上标记具体的标准差数值
+% hold on;
+% for i = 1:numel(X)
+%     if ~isnan(Z_sd_reach_dir(i))
+%         text(X(i), Y(i), Z_sd_reach_dir(i)+0.1, sprintf('%.2f',Z_sd_reach_dir(i)),...
+%             'FontSize',10,'FontWeight','bold',...
+%             'HorizontalAlignment','center',...
+%             'VerticalAlignment','bottom');
+%     end
+% end
+% hold off;
+% 
+% %% 3D plot of Distance vs. Shrinking Speed vs. Sd of Error (orthognal)
+% 
+% % 创建新的图窗口（避免覆盖之前的图）
+% figure;
+% 
+% % 定义目标距离区间范围
+% distance_bins = [50,150; 150,250; 250,300]; % 三个距离区间 (mm)
+% speed_values = [11.6560, 14.5700, 19.4267, 29.1400]; % 四个速度水平 (mm/s)
+% 
+% % 定义每个区间的中心点和标签（用于绘图）
+% distance_centers = [100, 200, 275]; % 最后一个区间中心取275
+% distance_labels = {'50-150mm','150-250mm','250-300mm'};
+% 
+% % 创建绘图网格
+% [X,Y] = meshgrid(speed_values, distance_centers);
+% 
+% % 初始化Z矩阵用于存放正交误差标准差
+% Z_sd_orthogonal = NaN(size(X));
+% 
+% % 计算每个grid内正交误差(copy(:,29))的标准差
+% for i = 1:size(distance_bins,1)
+%     for j = 1:length(speed_values)
+% 
+%         % 提取当前bin的数据索引
+%         idx = copy(:,10) >= distance_bins(i,1) & copy(:,10) < distance_bins(i,2) & ...
+%               abs(copy(:,32) - speed_values(j)) < 0.01; % 注意使用的是copy(:,32)
+% 
+%         % 计算标准差(Standard Deviation)
+%         Z_sd_orthogonal(i,j) = std(copy(idx,29),'omitnan');
+%     end
+% end
+% 
+% % 绘制3D曲面图 (正交误差标准差)
+% surf(X,Y,Z_sd_orthogonal);
+% 
+% % 设置颜色映射和颜色条
+% colormap('jet');
+% colorbar;
+% 
+% % 设置轴标签和图标题
+% xlabel('Target Shrinking Speed (mm/s)','FontSize',12);
+% ylabel('Target Distance Bin','FontSize',12);
+% zlabel('STD of Orthogonal Error (mm)','FontSize',12);
+% title('3D Surface: Distance Bin vs. Shrinking Speed vs. STD of Orthogonal Error','FontSize',14);
+% 
+% % 调整Y轴刻度标签
+% yticks(distance_centers);
+% yticklabels(distance_labels);
+% 
+% % 设置网格线和平滑显示
+% grid on;
+% shading interp; 
+% view(-45,30);
+% 
+% % 在每个数据点上标记具体的标准差数值
+% hold on;
+% for i = 1:numel(X)
+%     if ~isnan(Z_sd_orthogonal(i))
+%         text(X(i), Y(i), Z_sd_orthogonal(i)+0.1, sprintf('%.2f',Z_sd_orthogonal(i)),...
+%             'FontSize',10,'FontWeight','bold',...
+%             'HorizontalAlignment','center',...
+%             'VerticalAlignment','bottom');
+%     end
+% end
+% hold off;
+% 
+% 
+% %%
+% %
+% reCenteredTrajX = NaN(size(copy,1),size(validTraX,2));
+% reCenteredTrajY = NaN(size(copy,1),size(validTraX,2));
+% 
+% for i = 1:size(copy,1)
+%     reCenteredTrajX(i,:) = (validTraX(i,:) - copy(i,8)) .* pixellength;
+%     reCenteredTrajY(i,:) = (validTraY(i,:) - copy(i,9)) .* pixellength;
+% end
+% 
+% maxDuration = sum((sum(~isnan(reCenteredTrajX),1))~=0);
+% traProjection = NaN(size(copy,1),maxDuration);
+% for i = 1:maxDuration
+%     traProjection(:,i) = (abs(dot([reCenteredTrajX(:,i),reCenteredTrajY(:,i)],copy(:,24:25),2) ./ dot(copy(:,24:25),copy(:,24:25),2))); %逐时间点投影计算
+% end
+% speedProjection = traProjection(:,2:end) - traProjection(:,1:end-1);
+% accProjection = speedProjection(:,2:end) - speedProjection(:,1:end-1); %思考：这个有用吗？
+% 
+% endTime = sum(~isnan(reCenteredTrajX),2); 
+% b0 = [1,-1,45];
+% bUB = [2,-0.1,100]; % [b(1)上下值，slope, maxspeed x轴值]  % b(1) - 决定 sigmoid 曲线的最大值
+% bLB = [0.1,-1.5,0];
+% 
+% sigmoidFit = NaN(3,size(copy,1));
+% for i = 1:size(copy,1)
+%     x = 1:endTime(i); % x是时间
+%     y = traProjection(i,x);  % y是走过的比例 
+%     x = 1:sum(y<1.5); % x给了一个限制（限制y要小于1.5倍的距离
+%     y = traProjection(i,x); % 在该限制下的y取值
+%     fun = @(b) sum(((b(1)./(1+exp(b(2)*(x-b(3)))))-y).^2); %sigmoidFit's formula 
+%     % b = bads(fun,b0,bLB,bUB); % lsqnonlin is the funtion of sigmoidFit
+%     b = bads(fun,b0,bLB,bUB); % lsqnonlin is the funtion of sigmoidFit
+%     sigmoidFit(:,i) = b; % save b(b,a,c,3 parameters) into a table named signoidFit
+% end
 %%
  figure(1) %画sigmoid的图出来
     for i = 1:5

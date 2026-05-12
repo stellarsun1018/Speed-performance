@@ -103,24 +103,21 @@ copy(copy(:,27)>=181 & copy(:,27)<=240,31) = 0.4;
 % 在copy中新增第32列：target shrinking speed (mm/s)
 copy(:,32) = copy(:,15) ./ copy(:,31);
 
-%%  polar coordination 
 
-angle_error_in_radian = asin(copy(:,29) ./ copy(:,21));
-
-angle_error_in_degree = rad2deg(angle_error_in_radian);
-
-copy(:,33) = angle_error_in_radian;
-copy(:,34) = angle_error_in_degree;
-
-colors = lines(3);  % 三种颜色
-
-%% 3 blocks - conditions graphs
+%% 3 blocks - conditions graphs SPEED
 
 lim_scale = 1.2;
+colors = lines(3); % 蓝/红/黄 metrics
+
+blockNames = {'Block 1 (short distances)', ...
+              'Block 2 (medium distances)', ...
+              'Block 3 (long distances)'};
+
 figure()
 for i = 1:3
     block_ind = zeros(size(copy,1),1);
     block_ind((1+(i-1)*240):(i*240)) = 1;
+    
     subplot(1,3,i)
 
     distances = copy(block_ind==1,10);
@@ -128,13 +125,14 @@ for i = 1:3
     x = linspace(0,lim_scale*max(copy(:,10)),2);
     y = x ./ unique(copy(block_ind==1,3));
     
-    plot(distances,avg_speed,'o');
+    % plot(distances,avg_speed,'o');
+    scatter(distances, avg_speed, 25, colors(i,:), 'o');
     hold on
 
     mdl = fitlm(distances,avg_speed);
     x_fit = linspace(0, lim_scale * max(copy(:,10)), 2);
     y_fit = mdl.Coefficients.Estimate(1) + mdl.Coefficients.Estimate(2) .* x_fit;
-    plot(x_fit, y_fit, '--', 'LineWidth', 2);
+    plot(x_fit, y_fit, 'k-', 'LineWidth', 1);
 
 
 % 原始 condition line: speed = distance / lifespan
@@ -147,7 +145,8 @@ for i = 1:3
     hold off
     xlabel("Target Distance (mm)");
     ylabel("Average Speed (mm/s)");
-    legend('Trial data','Linear Fit','Min speed (match disappear deadline)', 'Min speed (half-size target)','Location','northwest')
+    title(blockNames{i})
+    legend('Data','Linear Fit','Disappear deadline', 'Half-target time','Location','southeast')
     xlim([0,lim_scale * max(copy(:,10))]);
     ylim([0,lim_scale * max(copy(:,22))]);
 
@@ -159,12 +158,12 @@ for i = 1:3
     % ylim([0,lim_scale * max(copy(:,22))]);
 end
 
-sgtitle("Arriving earlier for shorter distances and later for longer distances")
+% sgtitle("Arriving earlier for shorter distances and later for longer distances")
 
 %%
 %% 3 blocks - conditions graphs DURATION
 
-% lim_scale = 1.2;
+lim_scale = 1.2;
 figure()
 for i = 1:3
     block_ind = zeros(size(copy,1),1);
@@ -204,6 +203,9 @@ sgtitle("Arriving earlier for shorter distances and later for longer distances")
 %% Overlay all 3 blocks with regression lines through origin
 figure;
 colors = lines(3);  % 三种颜色
+% blockColors = [0 0.45 0.95;   % blue
+%                1 0 0;        % red
+%                1 0.9 0];     % yellow
 
 % 初始化 legend 对象数组
 h_scatter = gobjects(3,1);
@@ -223,7 +225,7 @@ for i = 1:3
     y_fit = mdl.Coefficients.Estimate(1) + mdl.Coefficients.Estimate(2) .* x_fit;
 
     % 虚线拟合线，并保存句柄
-    h_line(i) = plot(x_fit, y_fit, '--', 'Color', colors(i,:), 'LineWidth', 2);
+    h_line(i) = plot(x_fit, y_fit, 'k-', 'LineWidth', 1.3);
 
     % 显示 slope
     fprintf('Block %d: slope = %.2f, implied lifespan = %.2f sec\n', i, k, 1/k);
@@ -234,16 +236,21 @@ ylim([0,lim_scale * max(copy(:,22))]);
 
 xlabel('Target Distance (mm)');
 ylabel('Average Speed (mm/s)');
-title('Distance vs Speed (3 Blocks)');
+% title('Distance vs Speed (3 Blocks)');
 
 % 用回归线句柄生成 legend（不是散点）
-legend(h_line, ...
-    {'Block 1 (slope)', 'Block 2 (slope)', 'Block 3 (slope)'}, ...
-    'Location', 'northwest');
+h_fit_legend = plot(nan, nan, 'k-', 'LineWidth', 1); % dummy line for legend
+
+legend([h_scatter(1), h_scatter(2), h_scatter(3), h_fit_legend], ...
+       {'Block 1 (short distance)', ...
+        'Block 2 (medium distance)', ...
+        'Block 3 (long distance)', ...
+        'Regression fit lines'}, ...
+       'Location', 'northwest');
 
 grid on;
 
-%%  Duration histograms by block (overlapped) + disappearance time lines
+%% ？  Duration histograms by block (overlapped) + disappearance time lines
 % copy(:,16) = duration(s); copy(:,3) = lifespan(s)（每个block恒定）
 
 assert(size(copy,1) >= 3*240, '预期每个block约240 trial，请确认数据尺寸。');
@@ -252,7 +259,7 @@ trialsPerBlock = 240;
 blocks = 1:3;
 
 % 颜色（与要求一致：红/蓝/黄）
-blockColors = [1 0 0; 0 0.45 0.95; 1 0.9 0]; % red, blue, yellow
+blockColors = [0 0.45 0.95; 1 0 0; 1 0.9 0]; % red, blue, yellow
 
 % 收集各 block 的 duration
 Dur = cell(1,3);
@@ -294,21 +301,44 @@ for i = blocks
             'Color', blockColors(i,:), 'LineWidth', 2);
     end
 end
-xlabel('Reach Duration T (s)');
+xlabel('Reach Duration (s)');
 ylabel('Density');
-title('Overlapped Duration Histograms with Disappearance Times');
+% title('Overlapped Duration Histograms with Disappear Times');
 grid on;
 
 % 图例：区分直方图与其对应的消失时间
-lgd = legend( ...
-    [hH(1) hH(2) hH(3) hV(1) hV(2) hV(3)], ...
-    {'Block 1 durations','Block 2 durations','Block 3 durations', ...
-     sprintf('Block 1 disappear @ %.2fs', Tdisappear(1)), ...
-     sprintf('Block 2 disappear @ %.2fs', Tdisappear(2)), ...
-     sprintf('Block 3 disappear @ %.2fs', Tdisappear(3))}, ...
-    'Location','northwest');
-lgd.Box = 'off';
-hold off;
+% lgd = legend( ...
+%     [hH(1) hH(2) hH(3) hV(1) hV(2) hV(3)], ...
+%     {'Block 1 (short distance)','Block 2 (medium distance)','Block 3 (long distance)', ...
+%      sprintf('Block 1 disappear time %.2fs', Tdisappear(1)), ...
+%      sprintf('Block 2 disappear time %.2fs', Tdisappear(2)), ...
+%      sprintf('Block 3 disappear time %.2fs', Tdisappear(3))}, ...
+%     'Location','northwest');
+% lgd.Box = 'off';
+% hold off;
+
+% Example legend-table data
+Time = {'600 ms'; '800 ms'; '1000 ms'};
+Distances = {'100, 120, 140 mm'; '120, 140, 160 mm'; '140, 160, 180 mm'};
+ColorBox = {'■'; '■'; '■'};  % will color the text itself
+
+T = table(ColorBox, Time, Distances);
+
+% Make the plot (dummy example)
+figure; plot(rand(10,3)); hold on
+
+% Put a table in the figure (position is in normalized figure units)
+uit = uitable('Data', T{:,:}, ...
+    'ColumnName', {'Color','Time','Distances'}, ...
+    'Units','normalized', ...
+    'Position',[0.62 0.62 0.35 0.30]);
+
+% Color the "■" cells (HTML works in many MATLAB versions for uitable)
+uit.Data{1,1} = '<html><font color="#0000FF">■</font></html>';
+uit.Data{2,1} = '<html><font color="#FF0000">■</font></html>';
+uit.Data{3,1} = '<html><font color="#FFD400">■</font></html>';
+%%
+
 
 %% Compare mean durations across blocks (bar + errorbars) + print stats
 % !!!!!!!add error bar to this, make alpha = 0.7 or something for it's more
@@ -483,9 +513,299 @@ for p = 1:3
     fprintf('Block %d vs Block %d: p = %.4g\n', pairs(p,1), pairs(p,2), p_values(p));
 end
 
-%%
+%% Duration
 
-%%  Z axis: Gain error ~ reach distance + speed
+%% Z axis: Gain error ~ reach distance + Duration copy(:,16) 
+% Extract variables
+reach_distances = copy(:,21);
+reach_dur = copy(:,16);
+Reach_errors = copy(:,23);
+
+% Prepare the design matrix (adding a column of ones for intercept)
+X = [ones(size(reach_distances)), reach_distances, reach_dur];
+
+% Perform multivariate linear regression
+coeffs = regress(Reach_errors, X);
+
+% Display regression coefficients
+fprintf('Intercept: %.4f\n', coeffs(1));
+fprintf('Distance coefficient: %.4f\n', coeffs(2));
+fprintf('Reach duration coefficient: %.4f\n', coeffs(3));
+
+% 3D scatter plot of the original data
+figure;
+plot3(reach_distances, reach_dur, Reach_errors, 'o');
+hold on;
+
+xlim([0 max(reach_distances)]);
+ylim([0 max(reach_dur)]);
+
+% Generate grid for regression plane
+[dist_grid, dur_grid] = meshgrid(linspace(min(reach_distances), max(reach_distances), 20), ...
+                                   linspace(min(reach_dur), max(reach_dur), 20));
+
+% Predict errors using regression model
+error_fit = coeffs(1) + coeffs(2)*dist_grid + coeffs(3)*dur_grid;
+
+% Plot regression plane
+mesh(dist_grid, dur_grid, error_fit);
+xlabel('Reach Distance (mm)');
+ylabel('Reach Duration (s)');
+zlabel('Gain Error (mm)');
+title('Multivariate Linear Regression: Gain Error ~ Reach Distance + Reach Duration');
+grid on;
+hold off;
+
+%% step 2: residuals 
+errors_predicted = X * coeffs;
+
+% Calculate residuals
+residuals1 = Reach_errors - errors_predicted;
+
+% 3D scatter plot of residuals
+figure;
+plot3(reach_distances, reach_dur, residuals1, 'ro');
+xlim([0 max(reach_distances)]);
+ylim([0 max(reach_dur)]);
+
+xlabel('Reach Distance (mm)');
+ylabel('Reach Duration (s)');
+zlabel('Residuals (mm)');
+title('Residuals of Multivariate Linear Regression: Reach Error ~ Distance + Duration');
+grid on;
+
+%% add Countours 加入等高线的residuals图 （version 1） 
+errors_predicted = X * coeffs;
+
+% Calculate residuals
+residuals1 = Reach_errors - errors_predicted;
+
+% 3D scatter plot of residuals
+figure;
+plot3(reach_distances, reach_dur, residuals1, 'ro');
+hold on;
+
+xlim([0 max(reach_distances)]);
+ylim([0 max(reach_dur)]);
+
+% ---- Build grid for residual contour ----
+[dist_grid, dur_grid] = meshgrid( ...
+    linspace(min(reach_distances), max(reach_distances), 40), ...
+    linspace(min(reach_dur), max(reach_dur), 40));
+
+% Interpolate residuals onto grid
+residual_grid = griddata( ...
+    reach_distances, reach_dur, residuals1, ...
+    dist_grid, dur_grid, 'natural');
+
+% ---- Add contour projection on bottom plane ----
+z_level = min(residual_grid(:));  % 投影到最低 residual平面？还是说应该投影到零残差平面？
+contour3(dist_grid, dur_grid, residual_grid, ...
+         6, 'k', 'LineWidth', 1);
+
+xlabel('Reach Distance (mm)');
+ylabel('Reach Duration (s)');
+zlabel('Residuals (mm)');
+title('Residuals of Multivariate Linear Regression: Reach Error ~ Distance + Duration');
+grid on;
+
+view(0,90)
+colorbar
+
+
+%% add Countours 加入等高线的residuals图 （version 2） 热力图
+errors_predicted = X * coeffs;
+
+% Calculate residuals
+residuals1 = Reach_errors - errors_predicted;
+
+% ===== SD heatmap of residuals (adaptive bins) + contours =====
+% Required inputs already exist:
+%   reach_distances (mm)  -> x
+%   reach_dur (s)         -> y
+%   residuals1 (mm)       -> z  (treat as raw motor error residual)
+
+% ---------- parameters you may tweak ----------
+targetPerBin = 6;     % 统计上希望“平均每个bin大概有多少trial”(越大 -> bin越少 -> 更稳定)
+minBin = 8;           % 最少每个维度多少个bin
+maxBin = 18;          % 最多每个维度多少个bin（太大容易空bin -> 不好看也不稳）
+minN = 3;             % 每个bin至少多少个trial才计算SD（<minN会先置NaN再插值）
+doSmooth = true;      % 平滑让contour更顺
+smoothSigma_bins = 1.0; % 平滑强度（单位：bin，1~1.5常用）
+fineN = 220;          % 显示用的细网格分辨率（越大越细腻）
+
+nLevels = 12;         % contour层数
+overlayPoints = true; % 是否叠加原始点云
+
+% ---------- clean vectors ----------
+x = reach_distances(:);
+y = reach_dur(:);
+z = residuals1(:);
+
+valid = isfinite(x) & isfinite(y) & isfinite(z);
+x = x(valid); y = y(valid); z = z(valid);
+
+n = numel(z);
+
+% ---------- choose a sensible bin count automatically ----------
+nb = round(sqrt(n / targetPerBin));   % e.g. n=720,targetPerBin=6 -> nb~11
+nb = max(minBin, min(maxBin, nb));
+nbx = nb; nby = nb;
+
+% ---------- edges ----------
+xedges = linspace(min(x), max(x), nbx+1);
+yedges = linspace(min(y), max(y), nby+1);
+
+% ---------- bin assignment ----------
+[~,~,bx] = histcounts(x, xedges);
+[~,~,by] = histcounts(y, yedges);
+in = (bx>0) & (by>0);
+bx = bx(in); by = by(in);
+x  = x(in);  y  = y(in);  z  = z(in);
+
+% ---------- per-bin N, sum, sumsq (stable SD) ----------
+countGrid = accumarray([by, bx], 1,    [nby, nbx], @sum, 0);
+sumGrid   = accumarray([by, bx], z,    [nby, nbx], @sum, 0);
+sumSqGrid = accumarray([by, bx], z.^2, [nby, nbx], @sum, 0);
+
+% unbiased sample variance
+varGrid = (sumSqGrid - (sumGrid.^2)./max(countGrid,1)) ./ max(countGrid-1, 1);
+varGrid(countGrid < minN) = NaN;
+varGrid(varGrid < 0) = 0;     % numerical guard
+sdGrid = sqrt(varGrid);
+
+% 如果minN太严格导致可用bin太少，自动放宽到2
+if nnz(isfinite(sdGrid)) < 12
+    minN = 2;
+    varGrid = (sumSqGrid - (sumGrid.^2)./max(countGrid,1)) ./ max(countGrid-1, 1);
+    varGrid(countGrid < minN) = NaN;
+    varGrid(varGrid < 0) = 0;
+    sdGrid = sqrt(varGrid);
+end
+
+% ---------- bin centers ----------
+xc = (xedges(1:end-1) + xedges(2:end)) / 2;   % 1×nbx
+yc = (yedges(1:end-1) + yedges(2:end)) / 2;   % 1×nby
+[Xc, Yc] = meshgrid(xc, yc);                  % nby×nbx
+
+% ---------- fill empty bins so the heatmap is FULL (关键：铺满渐变颜色) ----------
+mask = isfinite(sdGrid);
+F = scatteredInterpolant(Xc(mask), Yc(mask), sdGrid(mask), 'natural', 'nearest');
+sdFill = F(Xc, Yc);   % now full matrix (no NaN)
+
+% ---------- smooth in bin-space (optional, makes contours nice) ----------
+sdSmooth = sdFill;
+if doSmooth
+    ksz = max(3, 2*ceil(3*smoothSigma_bins)+1);
+    r = (-floor(ksz/2)):(floor(ksz/2));
+    [kx, ky] = meshgrid(r, r);
+    K = exp(-(kx.^2 + ky.^2) / (2*smoothSigma_bins^2));
+    K = K / sum(K(:));
+    sdSmooth = conv2(sdSmooth, K, 'same');
+end
+
+% ---------- upsample to a fine grid for a smooth-looking heatmap ----------
+xq = linspace(min(xc), max(xc), fineN);
+yq = linspace(min(yc), max(yc), fineN);
+[XX, YY] = meshgrid(xq, yq);
+
+% cubic makes it look like your attached smooth gradients
+sdFine = interp2(xc, yc, sdSmooth, XX, YY, 'cubic');
+
+% ---------- plot: imagesc + contour (like your example) ----------
+figure('Name','Residual SD heatmap (adaptive bins) + contours');
+
+imagesc(xq, yq, sdFine);
+set(gca, 'YDir', 'normal');   % axis xy
+axis tight;
+hold on;
+
+contour(xq, yq, sdFine, nLevels, 'k', 'LineWidth', 1);
+
+if overlayPoints
+    scatter(x, y, 10, 'k', 'filled', ...
+        'Marker', 's', 'MarkerFaceAlpha', 0.18, 'MarkerEdgeAlpha', 0.18);
+end
+
+cb = colorbar;
+cb.Label.String = 'SD of residual (mm)';
+
+% contrast: avoid "looks like no color"
+cl = prctile(sdFine(:), [2 98]);
+caxis(cl);
+
+xlabel('Reach Distance (mm)');
+ylabel('Reach Duration (s)');
+title(sprintf('Residual SD heatmap (bins=%dx%d, targetPerBin=%g, minN=%d)', nbx, nby, targetPerBin, minN));
+grid on;
+hold off;
+
+
+
+%% Z axis: Orthognal error ~ reach distance + Duration copy(:,16) 
+% Extract variables
+reach_distances = copy(:,21);
+reach_dur = copy(:,16);
+Orth_errors = copy(:,29);
+
+% Prepare the design matrix (adding a column of ones for intercept)
+X = [ones(size(reach_distances)), reach_distances, reach_dur];
+
+% Perform multivariate linear regression
+coeffs = regress(Orth_errors, X);
+
+% Display regression coefficients
+fprintf('Intercept: %.4f\n', coeffs(1));
+fprintf('Distance coefficient: %.4f\n', coeffs(2));
+fprintf('Reach duration coefficient: %.4f\n', coeffs(3));
+
+% 3D scatter plot of the original data
+figure;
+plot3(reach_distances, reach_dur, Orth_errors, 'o');
+hold on;
+
+xlim([0 max(reach_distances)]);
+ylim([0 max(reach_dur)]);
+
+% Generate grid for regression plane
+[dist_grid, dur_grid] = meshgrid(linspace(min(reach_distances), max(reach_distances), 20), ...
+                                   linspace(min(reach_dur), max(reach_dur), 20));
+
+% Predict errors using regression model
+error_fit = coeffs(1) + coeffs(2)*dist_grid + coeffs(3)*dur_grid;
+
+% Plot regression plane
+mesh(dist_grid, dur_grid, error_fit);
+xlabel('Reach Distance (mm)');
+ylabel('Reach Duration (s)');
+zlabel('Orthognal Error (mm)');
+title('Multivariate Linear Regression: Orthognal Error ~ Reach Distance + Reach Duration');
+grid on;
+hold off;
+
+%% step 2: residuals 
+errors_predicted = X * coeffs;
+
+% Calculate residuals
+residuals1 = Orth_errors - errors_predicted;
+
+% 3D scatter plot of residuals
+figure;
+plot3(reach_distances, reach_dur, residuals1, 'ro');
+xlim([0 max(reach_distances)]);
+ylim([0 max(reach_dur)]);
+
+xlabel('Reach Distance (mm)');
+ylabel('Reach Duration (s)');
+zlabel('Residuals (mm)');
+title('Residuals of Multivariate Linear Regression: Orthognal Error ~ Distance + Duration');
+grid on;
+
+
+%% Speed
+
+
+%%  Z axis: Gain error ~ reach distance + speed (avg_speed = copy(:,22))
 % Extract variables
 reach_distances = copy(:,21);
 avg_speed = copy(:,22);
@@ -504,7 +824,7 @@ fprintf('Average speed coefficient: %.4f\n', coeffs(3));
 
 % 3D scatter plot of the original data
 figure;
-plot3(reach_distances, avg_speed, Reach_errors, 'o');
+h_data = plot3(reach_distances, avg_speed, Reach_errors, 'o');
 hold on;
 
 xlim([0 max(reach_distances)]);
@@ -518,11 +838,12 @@ ylim([0 max(avg_speed)]);
 error_fit = coeffs(1) + coeffs(2)*dist_grid + coeffs(3)*speed_grid;
 
 % Plot regression plane
-mesh(dist_grid, speed_grid, error_fit);
+h_plane = mesh(dist_grid, speed_grid, error_fit);
 xlabel('Reach Distance (mm)');
 ylabel('Average Speed (mm/s)');
 zlabel('Gain Error (mm)');
-title('Multivariate Linear Regression: Gain Error ~ Reach Distance + Speed');
+legend([h_data, h_plane], {'Data', 'Regression plane'}, 'Location', 'northeast');
+% title('Multivariate Linear Regression: Gain Error ~ Reach Distance + Speed');
 grid on;
 hold off;
 
@@ -544,27 +865,26 @@ zlabel('Residuals (mm)');
 title('Residuals of Multivariate Linear Regression: Reach Error ~ Distance + Speed');
 grid on;
 
-%% Z axis: angular_error_in_degree (orthognal) ~ reach distance + speed
-
+%% Z axis: Orthognal error ~ reach distance + speed (avg_speed = copy(:,22))
 % Extract variables
 reach_distances = copy(:,21);
 avg_speed = copy(:,22);
-angle_error_in_degree = copy(:,34);
+Orth_errors = copy(:,29);
 
 % Prepare the design matrix (adding a column of ones for intercept)
 X = [ones(size(reach_distances)), reach_distances, avg_speed];
 
 % Perform multivariate linear regression
-coeffs = regress(angle_error_in_degree, X);
+coeffs = regress(Orth_errors, X);
 
 % Display regression coefficients
 fprintf('Intercept: %.4f\n', coeffs(1));
 fprintf('Distance coefficient: %.4f\n', coeffs(2));
-fprintf('Average speed coefficient: %.4f\n', coeffs(3));
+fprintf('Ave speed coefficient: %.4f\n', coeffs(3));
 
 % 3D scatter plot of the original data
 figure;
-plot3(reach_distances, avg_speed, angle_error_in_degree, 'o');
+h_data = plot3(reach_distances, avg_speed, Orth_errors, 'o');  % <-- 新增：保存 data 的 handle
 hold on;
 
 xlim([0 max(reach_distances)]);
@@ -578,29 +898,92 @@ ylim([0 max(avg_speed)]);
 error_fit = coeffs(1) + coeffs(2)*dist_grid + coeffs(3)*speed_grid;
 
 % Plot regression plane
-mesh(dist_grid, speed_grid, error_fit);
+h_plane = mesh(dist_grid, speed_grid, error_fit);  % <-- 新增：保存 plane 的 handle
 xlabel('Reach Distance (mm)');
 ylabel('Average Speed (mm/s)');
-zlabel('Angular error (degree)');
-title('Multivariate Linear Regression: Angle error ~ Reach Distance + Speed');
+zlabel('Orthognal Error (mm)');
+legend([h_data, h_plane], {'Data', 'Regression plane'}, 'Location', 'northeast');
+% title('Multivariate Linear Regression: Orthognal Error ~ Reach Distance + Speed');
 grid on;
 hold off;
 
-%% step 2: orthognal error residuals 
+%% step 2: residuals 
 errors_predicted = X * coeffs;
 
 % Calculate residuals
-residuals2 = angle_error_in_degree - errors_predicted;
+residuals1 = Orth_errors - errors_predicted;
 
 % 3D scatter plot of residuals
 figure;
-plot3(reach_distances, avg_speed, residuals2, 'ro');
+plot3(reach_distances, avg_speed, residuals1, 'ro');
 xlim([0 max(reach_distances)]);
 ylim([0 max(avg_speed)]);
 
 xlabel('Reach Distance (mm)');
 ylabel('Average Speed (mm/s)');
 zlabel('Residuals (mm)');
-title('Residuals of Multivariate Linear Regression: Angular Error ~ Distance + Speed');
+title('Residuals of Multivariate Linear Regression: Orthognal Error ~ Distance + Speed');
 grid on;
 
+
+%%
+%% Z axis: angular_error_in_degree ~ reach distance + speed
+% 
+% % Extract variables
+% reach_distances = copy(:,21);
+% avg_speed = copy(:,22);
+% angle_error_in_degree = copy(:,34);
+% 
+% % Prepare the design matrix (adding a column of ones for intercept)
+% X = [ones(size(reach_distances)), reach_distances, avg_speed];
+% 
+% % Perform multivariate linear regression
+% coeffs = regress(angle_error_in_degree, X);
+% 
+% % Display regression coefficients
+% fprintf('Intercept: %.4f\n', coeffs(1));
+% fprintf('Distance coefficient: %.4f\n', coeffs(2));
+% fprintf('Average speed coefficient: %.4f\n', coeffs(3));
+% 
+% % 3D scatter plot of the original data
+% figure;
+% plot3(reach_distances, avg_speed, angle_error_in_degree, 'o');
+% hold on;
+% 
+% xlim([0 max(reach_distances)]);
+% ylim([0 max(avg_speed)]);
+% 
+% % Generate grid for regression plane
+% [dist_grid, speed_grid] = meshgrid(linspace(min(reach_distances), max(reach_distances), 20), ...
+%                                    linspace(min(avg_speed), max(avg_speed), 20));
+% 
+% % Predict errors using regression model
+% error_fit = coeffs(1) + coeffs(2)*dist_grid + coeffs(3)*speed_grid;
+% 
+% % Plot regression plane
+% mesh(dist_grid, speed_grid, error_fit);
+% xlabel('Reach Distance (mm)');
+% ylabel('Average Speed (mm/s)');
+% zlabel('Angular error (degree)');
+% title('Multivariate Linear Regression: Angle error ~ Reach Distance + Speed');
+% grid on;
+% hold off;
+% 
+% %% step 2: Angular error residuals 
+% errors_predicted = X * coeffs;
+% 
+% % Calculate residuals
+% residuals2 = angle_error_in_degree - errors_predicted;
+% 
+% % 3D scatter plot of residuals
+% figure;
+% plot3(reach_distances, avg_speed, residuals2, 'ro');
+% xlim([0 max(reach_distances)]);
+% ylim([0 max(avg_speed)]);
+% 
+% xlabel('Reach Distance (mm)');
+% ylabel('Average Speed (mm/s)');
+% zlabel('Residuals (mm)');
+% title('Residuals of Multivariate Linear Regression: Angular Error ~ Distance + Speed');
+% grid on;
+% 
