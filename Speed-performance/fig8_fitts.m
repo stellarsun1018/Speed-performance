@@ -27,7 +27,7 @@
 %% Load Data
 clear all
 close all
-participant = 'LL';
+participant = 'JH';
 fname_preamble = sprintf('data_onlineConf/usable/%s_sptatialTemporalCostFunc*.mat',participant);
 files = dir(fname_preamble);
 for k = 1:numel(files)
@@ -519,25 +519,35 @@ for blk = 1:length(target_live_spans)
 end
 
 % Plot 1: p(hit) vs Distance (colored by lifespan block)
-figure('Name', 'Per-Trial p(hit) and Optimal Duration');
+figure('Name', 'Per-Trial p(hit)');
 colors = lines(length(target_live_spans));  % Color palette for blocks
 
-subplot(1, 2, 1);
 hold on;
 for blk = 1:length(target_live_spans)
     idx_trials = life_span_keys(blk, :) == 1;
-    scatter(distances(idx_trials), p_hits(idx_trials), 50, colors(blk, :), 'filled', 'MarkerFaceAlpha', 0.7);
+    scatter(speeds(idx_trials), p_hits(idx_trials), 50, colors(blk, :), 'filled', 'MarkerFaceAlpha', 0.7);
 end
 xlabel('Distance (mm)');
 ylabel('Predicted P(hit)');
 % title('Predicted P(hit) vs Distance');
-ylim([0,1])
-legend('Fast','Medium','Slow','Location', 'northeast');
+% xlim([0,350]);      % x轴从0开始
+ylim([0,1]);        % y轴从0开始
+% xticks([0 50 150 250 350]);
+yticks(0:0.2:1);
+set(gca,'FontSize',14)
+lgd = legend('Fast','Medium','Slow');
+
+lgd.Location = 'northeast';
+lgd.Title.String = 'Shrinkage speed';
+
+lgd.FontSize = 14;
+lgd.Box = 'on';
+lgd.LineWidth = 1.0;
 grid off;
 hold off;
 
 % Plot 2: Actual Duration vs Optimal Duration for Max Expected Gain (colored by lifespan block)
-subplot(1, 2, 2);
+figure('Name', 'Actual vs Optimal Duration');
 hold on;
 for blk = 1:length(target_live_spans)
     idx_trials = life_span_keys(blk, :) == 1;
@@ -545,9 +555,11 @@ for blk = 1:length(target_live_spans)
 end
 xlabel('Actual Duration (s)');
 ylabel('Optimal Duration (s)');
-xlim([0.1,0.9])
-xticks(0.1:0.1:0.9)
-ylim([0.1,0.9])
+xlim([0,0.9]);      % x轴从0开始
+ylim([0,0.9]);      % y轴从0开始
+xticks(0:0.2:1);
+yticks(0:0.2:1);
+set(gca,'FontSize',14)
 % title('Actual vs Optimal Duration for Max Expected Gain');
 % Add reference line (y = x)
 plot(xlim,ylim,'--k')
@@ -559,7 +571,6 @@ grid off;
 hold off;
 
 
-sgtitle(sprintf('Participant %s: Per-Trial Predictions', participant));
 
 % Optional: Save the figure
 % saveas(gcf, fullfile('fitts_plots', sprintf('Participant_%s_PerTrial_Predictions.png', participant)));
