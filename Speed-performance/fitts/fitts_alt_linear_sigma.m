@@ -27,7 +27,7 @@
 
 %% Load Data 
 clear all
-participant = 'LC';
+participant = 'JH';
 fname_preamble = sprintf('../data_onlineConf/usable/%s_sptatialTemporalCostFunc*.mat',participant);
 files = dir(fname_preamble);
 for k = 1:numel(files)
@@ -109,40 +109,75 @@ dir_coeffs = regress(dir_error, X);
 dir_bias_offset = dir_coeffs(1) + dir_coeffs(2)*distances + dir_coeffs(3)*durations;
 dir_error = dir_error - dir_bias_offset;
 
-
 %%
-thetaUB = [ 0.1,   10,  10];
-thetaLB = [-0.1,  -10,  0.1];
+function Sigma = local_cov_pred(stdF, phi, dist, dur)
+sig_gain = stdF(phi(1:3), dist, dur);      % σ_g in linear scale
+sig_dir = stdF(phi(4:6), dist, dur);      % σ_d in linear scale
+rho = phi(7);                        % static correlation ρ
 
-phiUB = repmat(thetaUB,6,1);
-phiLB = repmat(thetaLB,6,1);
+if isscalar(sig_gain) && isscalar(sig_dir)
+    Sigma = [sig_gain.^2, rho*sig_gain*sig_dir; rho*sig_gain*sig_dir, sig_dir.^2];
+else
+    n = numel(sig_gain);
+    Sigma = arrayfun(@(i) [sig_gain(i).^2, rho*sig_gain(i)*sig_dir(i); ...
+        rho*sig_gain(i)*sig_dir(i), sig_dir(i).^2], ...
+        (1:n)', 'UniformOutput', false);
+end
+end
 
-num_runs = 1;
-phi_hat_flat_array = NaN(num_runs,numel(phiUB));
+fun_std = @(theta,dist,dur) max(theta(1) .* dist + theta(2) .* dur + theta(3),eps);
+
+stdF = fun_std;  % alias: std in linear scale (Fitts-style)
+
+% Parameters: [dist_gain, dur_gain, intercept_gain, dist_dir, dur_dir, intercept_dir, rho]
+phiUB = [ 2,  20,  10,  2,  20,  10,  0.95];
+phiLB = [-2, -20, -10, -2, -20, -10, -0.95];
+
+
+% Negative log-likelihood for zero-mean 2D Gaussian with sample-wise Sigma
+% fun_nll2d = @(phi) -sum(log(mvnpdf([gain_error,dir_error],zeros(1,2),local_cov_pred(stdF, phi, distances, durations))));
+fun_nll2d = @(phi) ...
+    (0.5*sum( ...
+    log( (stdF(phi(1:3),distances,durations).^2) .* ...
+    (stdF(phi(4:6),distances,durations).^2) .* (1 - phi(7).^2) ) + ...
+    (gain_error.^2) ./ (stdF(phi(1:3),distances,durations).^2) ...
+    - 2*phi(7) .* (gain_error.*dir_error) ./ ...
+    (stdF(phi(1:3),distances,durations).*stdF(phi(4:6),distances,durations)) + ...
+    (dir_error.^2) ./ (stdF(phi(4:6),distances,durations).^2) + ...
+    2*log(2*pi) ));
+
+% Iterative BADS
+num_runs = 10;
+phi_hat_array = NaN(num_runs,size(phiUB,2));
 nll_from_runs = NaN(num_runs,1);
-
-altnll = @(phi_flat) -sum(log(mvnpdf([gain_error,dir_error],zeros(1,2),wishart_get_cov(reshape(phi_flat,6,3), distances, durations))))
 for i = 1:num_runs
-    phi0 = thetaLB + rand(size(phiUB)) .* repmat(thetaUB-thetaLB,6,1);
+    phi0 = [rand*mean([phiUB(1),phiLB(1)]),  ... 
+        rand*mean([phiUB(2),phiLB(2)]),  ...
+        rand*mean([phiUB(3),phiLB(3)]),  ... 
+        rand*mean([phiUB(4),phiLB(4)]),  ...
+        rand*mean([phiUB(5),phiLB(5)]),  ...
+        rand*mean([phiUB(6),phiLB(6)]),  ...
+        0];
+    phi0 = phi0 + eps;
 
-    phi0_flat = reshape(phi0,1,numel(phi0));
-    phiUB_flat = reshape(phiUB,1,numel(phiUB));
-    phiLB_flat = reshape(phiLB,1,numel(phiLB));
-    phi_hat_flat_array(i,:) = bads(altnll, phi0_flat, phiLB_flat, phiUB_flat);
-    nll_from_runs(i) = altnll(phi_hat_flat_array(i,:));
+    phi_hat_array(i,:) = bads(fun_nll2d, phi0, phiLB, phiUB);
+    nll_from_runs(i) = fun_nll2d(phi_hat_array(i,:));
 end
 
 [~,best_ind] = min(nll_from_runs);
-phi_hat = reshape(phi_hat_flat_array(best_ind,:),6,3)
+phi_hat = phi_hat_array(best_ind,:)
 
 % Covariance predictor:
 %  - If dist,dur are scalars: returns a 2x2 matrix.
 %  - If dist,dur are vectors (same length): returns a 1x1 cell array per i, each is 2x2.
-% cov_pred = @(phi, dist, dur) ...
-%     wishart_get_cov(phi, dist, dur);
+
+cov_pred = @(phi, dist, dur) ...
+    local_cov_pred(stdF, phi, dist, dur);
+
 
 %% Calculate Prediction Mapping from Fitted Parameters
 step_n = 100;
+rho = phi_hat(7);     % static correlation
 
 tar_size = unique(copy(:,15));
 smooth_dist = linspace(min(distances),max(distances),step_n);
@@ -151,287 +186,143 @@ zoom_dist = (max(distances) - min(distances)) ./ step_n;
 zoom_dur = (max(durations) - min(durations))./ step_n;
 
 [x,y] = meshgrid(smooth_dist,smooth_dur);
-cov_matrice_hypercube = NaN(2,2,step_n,step_n);
-for i = 1:step_n
-    cov_matrice_hypercube(:,:,:,i) = wishart_get_cov(phi_hat,x(:,i),y(:,i));
-end
-smooth_gain_std = squeeze(cov_matrice_hypercube(1,1,:,:));
-smooth_dir_std = squeeze(cov_matrice_hypercube(2,2,:,:));
+smooth_gain_std = fun_std(phi_hat(1:3),x,y);
+smooth_dir_std = fun_std(phi_hat(4:6),x,y);
 
-target_live_spans = sort(unique(copy(:,3)));
-life_span_keys = zeros(length(target_live_spans),size(copy,1));
-smooth_tar_size = NaN(length(target_live_spans),length(smooth_dist),length(smooth_dur));
-
-get_tar_size = @(dur,life_span,tar_size,dist) tar_size .* max((1 - dur ./ life_span),0);
-
-for i = 1:length(target_live_spans)
-    life_span_keys(i,:) = copy(:,3) == target_live_spans(i);
-    tar_size_array = get_tar_size(y,target_live_spans(i),tar_size,x);
-    % tar_size_array = tar_size_array';
-    smooth_tar_size(i, :, :) = tar_size_array; %repmat(tar_size_array,length(smooth_dist),1);
-end
-
-score_per_hit = @(term_size,tar_size,max_score) max_score .* max((term_size ./ tar_size),0);
-p_hit = @(term_size,sigma) normcdf(term_size, 0, sigma) - normcdf(-term_size, 0, sigma);
-exp_gain = @(term_size,sigma) p_hit(term_size,sigma) .* score_per_hit(term_size,tar_size,10);
 %%
 function P = local_p_hit2d_rect(a, sg, sd, rho)
 % Compute P(|G|<=a, |D|<=a) where [G;D] ~ N(0, Sigma), Sigma = [sg^2, rho*sg*sd; rho*sg*sd, sd^2]
 % Vectorized over matching arrays a, sg, sd. Tries mvncdf; if unavailable, falls back to MC.
 
-    % basic input checks / broadcasting guard
-    if ~isequal(size(a), size(sg)) || ~isequal(size(a), size(sd))
-        error('local_p_hit2d_rect: size mismatch among a, sg, sd.');
-    end
-
-    % Flatten to 1D for a simple loop, then reshape back
-    a_v  = a(:);
-    sg_v = sg(:);
-    sd_v = sd(:);
-    n    = numel(a_v);
-    P_v  = nan(n,1);
-
-    % Try exact bivariate normal CDF over rectangle with mvncdf
-    can_mvncdf = exist('mvncdf','file') == 2;
-
-    if can_mvncdf
-        for k = 1:n
-            ak  = a_v(k);
-            sgk = sg_v(k);
-            sdk = sd_v(k);
-            % Guard tiny/zero stds
-            sgk = max(sgk, realmin('double'));
-            sdk = max(sdk, realmin('double'));
-
-            % Lower/Upper bounds and Sigma
-            lo = [-ak, -ak];
-            hi = [ ak,  ak];
-            Sigma = [sgk^2, rho*sgk*sdk; rho*sgk*sdk, sdk^2];
-
-            % mvncdf returns the prob mass in the rectangle
-            P_v(k) = mvncdf(lo, hi, [0 0], Sigma);
-        end
-    else
-        % Monte Carlo fallback (fast-ish): independent base normals + correlate via Cholesky
-        % Note: MC per grid point can be costly; keep N moderate.
-        N = 1000;  % adjust if you want smoother estimates vs runtime
-        Z = randn(N, 2);  % reused base samples
-        for k = 1:n
-            ak  = a_v(k);
-            sgk = sg_v(k);
-            sdk = sd_v(k);
-            sgk = max(sgk, realmin('double'));
-            sdk = max(sdk, realmin('double'));
-            Sigma = [sgk^2, rho*sgk*sdk; rho*sgk*sdk, sdk^2];
-
-            % Cholesky (robustify with jitter if needed)
-            [L,p] = chol(Sigma, 'lower');
-            if p>0
-                % add tiny jitter if Sigma is borderline
-                jitter = 1e-12 * max(Sigma(1,1)+Sigma(2,2), 1);
-                [L,~] = chol(Sigma + jitter*eye(2), 'lower');
-            end
-            X = Z * L.';  % N x 2 samples ~ N(0,Sigma)
-            P_v(k) = mean( abs(X(:,1)) <= ak & abs(X(:,2)) <= ak );
-        end
-    end
-
-    P = reshape(P_v, size(a));
+% basic input checks / broadcasting guard
+if ~isequal(size(a), size(sg)) || ~isequal(size(a), size(sd))
+    error('local_p_hit2d_rect: size mismatch among a, sg, sd.');
 end
 
-p_hit2d = @(a, sg, sd) local_p_hit2d_rect(a, sg, sd, rho);
+% Flatten to 1D for a simple loop, then reshape back
+a_v  = a(:);
+sg_v = sg(:);
+sd_v = sd(:);
+n    = numel(a_v);
+P_v  = nan(n,1);
+
+% Try exact bivariate normal CDF over rectangle with mvncdf
+can_mvncdf = exist('mvncdf','file') == 2;
+
+if can_mvncdf
+    for k = 1:n
+        ak  = a_v(k);
+        sgk = sg_v(k);
+        sdk = sd_v(k);
+        % Guard tiny/zero stds
+        sgk = max(sgk, realmin('double'));
+        sdk = max(sdk, realmin('double'));
+
+        % Lower/Upper bounds and Sigma
+        lo = [-ak, -ak];
+        hi = [ ak,  ak];
+        Sigma = [sgk^2, rho*sgk*sdk; rho*sgk*sdk, sdk^2];
+
+        % mvncdf returns the prob mass in the rectangle
+        P_v(k) = mvncdf(lo, hi, [0 0], Sigma);
+    end
+else
+    % Monte Carlo fallback (fast-ish): independent base normals + correlate via Cholesky
+    % Note: MC per grid point can be costly; keep N moderate.
+    N = 1000;  % adjust if you want smoother estimates vs runtime
+    Z = randn(N, 2);  % reused base samples
+    for k = 1:n
+        ak  = a_v(k);
+        sgk = sg_v(k);
+        sdk = sd_v(k);
+        sgk = max(sgk, realmin('double'));
+        sdk = max(sdk, realmin('double'));
+        Sigma = [sgk^2, rho*sgk*sdk; rho*sgk*sdk, sdk^2];
+
+        % Cholesky (robustify with jitter if needed)
+        [L,p] = chol(Sigma, 'lower');
+        if p>0
+            % add tiny jitter if Sigma is borderline
+            jitter = 1e-12 * max(Sigma(1,1)+Sigma(2,2), 1);
+            [L,~] = chol(Sigma + jitter*eye(2), 'lower');
+        end
+        X = Z * L.';  % N x 2 samples ~ N(0,Sigma)
+        P_v(k) = mean( abs(X(:,1)) <= ak & abs(X(:,2)) <= ak );
+    end
+end
+
+P = reshape(P_v, size(a));
+end
+
+
+x = linspace(min(distances),max(distances),100);
+
+k = 14;
+tar_size = 20;
+y = log2(2 .* x ./ tar_size) ./ k;
+tar_size_array = repmat(tar_size(i),size(x));
+rho_array = repmat(rho,size(x));
+p_of_hit = local_p_hit2d_rect(tar_size_array,fun_std(phi_hat(1:3),x,y),fun_std(phi_hat(4:6),x,y),phi_hat(7));
 
 %%
-% function EG = local_exp_score2d_mc(term_size, sg, sd, rho, tar_size, max_score, N)
-% % Monte Carlo expected score per grid cell for the radial scoring rule.
-% % Shapes: term_size, sg, sd are identical arrays (e.g., step_n x step_n).
-% % tar_size can be scalar or same-sized array. EG has same shape as inputs.
-% 
-%     if ~isequal(size(term_size), size(sg)) || ~isequal(size(term_size), size(sd))
-%         error('local_exp_score2d_mc: size mismatch among term_size, sg, sd.');
-%     end
-%     if ~isscalar(tar_size) && ~isequal(size(tar_size), size(term_size))
-%         error('local_exp_score2d_mc: tar_size must be scalar or match term_size size.');
-%     end
-% 
-%     % Vectorize over grid by flattening, then reshape back.
-%     a_v  = term_size(:);
-%     sg_v = max(sg(:),  realmin('double'));
-%     sd_v = max(sd(:),  realmin('double'));
-%     if isscalar(tar_size)
-%         ts_v = repmat(tar_size, numel(a_v), 1);
-%     else
-%         ts_v = tar_size(:);
-%     end
-%     n  = numel(a_v);
-%     EG_v = zeros(n,1);
-% 
-%     % Reuse base standard-normal samples for variance reduction & speed.
-%     if nargin < 7 || isempty(N), N = 2000; end
-%     Z = randn(N, 2); % N x 2, iid N(0, I)
-% 
-%     for k = 1:n
-%         ak  = a_v(k);         % term_size (acceptance radius)
-%         sgk = sg_v(k);
-%         sdk = sd_v(k);
-%         tsk = ts_v(k);
-% 
-%         % Build Sigma and its Cholesky
-%         Sigma = [sgk^2, rho*sgk*sdk; rho*sgk*sdk, sdk^2];
-%         [L,p] = chol(Sigma, 'lower');
-%         if p>0
-%             jitter = 1e-12 * max(Sigma(1,1)+Sigma(2,2), 1);
-%             [L,~] = chol(Sigma + jitter*eye(2), 'lower');
-%         end
-% 
-%         % Draw correlated samples ~ N(0, Sigma)
-%         X = Z * L.';                 % N x 2
-%         r = hypot(X(:,1), X(:,2));   % radial distance
-% 
-%         % Radial, linearly decaying score inside acceptance radius
-%         S = max_score * (1 - r./tsk);
-%         S(r > ak) = 0;               % zero outside term_size
-%         S(S < 0)  = 0;               % clamp if term_size < tar_size, etc.
-% 
-%         EG_v(k) = mean(S);
-%     end
-% 
-%     EG = reshape(EG_v, size(term_size));
-% end
-% 
-% 
-% % MC expected score maps for each lifespan
-% max_score = 10;
-% exp_gain_maps = cell(length(target_live_spans),1);
-% 
-% for i = 1:length(target_live_spans)
-%     a  = squeeze(smooth_tar_size(i,:,:));   % term_size grid (dist x dur)
-%     sg = smooth_gain_std;                   % σ_g grid
-%     sd = smooth_dir_std;                    % σ_d grid
-% 
-%     % tar_size can be a scalar 
-%     exp_gain_maps{i} = local_exp_score2d_mc(a, sg, sd, rho, tar_size, max_score, 2000);
-% end
+plot(p_of_hit,'--')
+%%
+figure();
 
-% exp_gain2d = @(a) local_exp_score2d_mc(a, smooth_gain_std, smooth_dir_std, rho, tar_size, max_score, 2000);
+% --- Subplot 1: Varying k ---
+subplot(1,2,1)
+x = linspace(min(distances), max(distances), 100);
+k_vals = 8:2:16;
+tar_size_fixed = 20;
+hold on
 
-%% Plot Specs
-column_num = 3;
-plot_colorbar = 1;
-%% Plot
-figure
-for i = 1:length(target_live_spans)
-    plot_idx = i-1;
-    subplot(length(target_live_spans),column_num,plot_idx * column_num + 1)
-    current_size_map = squeeze(smooth_tar_size(i,:,:));
-    imagesc(current_size_map)
-    hold on
-    contour(1:step_n, 1:step_n, current_size_map, 'LineColor', 'k', 'LineWidth', 1);
-    plot((distances(life_span_keys(i,:) == 1)-min(distances))./zoom_dist, ...
-        (durations(life_span_keys(i,:) == 1)-min(durations))./zoom_dur,'k.')
-    hold off
+for i = 1:length(k_vals)
+    y = log2(2 .* x ./ tar_size_fixed) ./ k_vals(i);
+    
+    % Calculate probability array
+    p_of_hit = local_p_hit2d_rect(repmat(tar_size_fixed, size(x)), ...
+               fun_std(phi_hat(1:3), x, y), ...
+               fun_std(phi_hat(4:6), x, y), phi_hat(7));
 
-    if i == length(target_live_spans)
-        xlabel('Distance')
-    elseif i == 1
-        title('Target Size')
-    end
-
-    ylabel('Duration')
-    xticks(linspace(1, step_n, 5));
-    xticklabels(round(linspace(min(smooth_dist), max(smooth_dist), 5), 0));
-    yticks(linspace(1, step_n, 5));
-    yticklabels(round(linspace(min(smooth_dur), max(smooth_dur), 5), 2));
-    if plot_colorbar; colorbar; end
-    axis xy
-
-    subplot(length(target_live_spans),column_num,plot_idx * column_num + 2)
-    imagesc(smooth_gain_std)
-    hold on
-    contour(1:step_n, 1:step_n, smooth_gain_std, 'LineColor', 'k', 'LineWidth', 1);
-    plot((distances(life_span_keys(i,:) == 1)-min(distances))./zoom_dist, ...
-        (durations(life_span_keys(i,:) == 1)-min(durations))./zoom_dur,'k.')
-    hold off
-
-    if i == length(target_live_spans)
-        xlabel('Distance')
-    elseif i == 1
-        title('Gain Sigma')
-    end
-
-    xticks(linspace(1, step_n, 5));
-    xticklabels(round(linspace(min(smooth_dist), max(smooth_dist), 5), 0));
-    yticks(linspace(1, step_n, 5));
-    yticklabels(round(linspace(min(smooth_dur), max(smooth_dur), 5), 2));
-    if plot_colorbar; colorbar; end
-    axis xy
-
-    subplot(length(target_live_spans),column_num,plot_idx * column_num + 3)
-    imagesc(smooth_dir_std)
-    hold on
-    contour(1:step_n, 1:step_n, smooth_dir_std, 'LineColor', 'k', 'LineWidth', 1);
-    plot((distances(life_span_keys(i,:) == 1)-min(distances))./zoom_dist, ...
-        (durations(life_span_keys(i,:) == 1)-min(durations))./zoom_dur,'k.')
-    hold off
-
-    if i == length(target_live_spans)
-        xlabel('Distance')
-    elseif i == 1
-        title('Directional Sigma')
-    end
-
-    xticks(linspace(1, step_n, 5));
-    xticklabels(round(linspace(min(smooth_dist), max(smooth_dist), 5), 0));
-    yticks(linspace(1, step_n, 5));
-    yticklabels(round(linspace(min(smooth_dur), max(smooth_dur), 5), 2));
-    if plot_colorbar; colorbar; end
-    axis xy
-
-    % subplot(length(target_live_spans),column_num,plot_idx * column_num + 4)
-    % current_phit_map = p_hit2d(current_size_map,smooth_gain_std,smooth_dir_std);
-    % imagesc(current_phit_map)
-    % hold on
-    % contour(1:step_n, 1:step_n, current_phit_map, 'LineColor', 'k', 'LineWidth', 1);
-    % plot((distances(life_span_keys(i,:) == 1)-min(distances))./zoom_dist, ...
-    %     (durations(life_span_keys(i,:) == 1)-min(durations))./zoom_dur,'k.')
-    % hold off
-    % 
-    % if i == length(target_live_spans)
-    %     xlabel('Distance')
-    % elseif i == 1
-    %     title('P(hit)')
-    % end
-    % 
-    % xticks(linspace(1, step_n, 5));
-    % xticklabels(round(linspace(min(smooth_dist), max(smooth_dist), 5), 0));
-    % yticks(linspace(1, step_n, 5));
-    % yticklabels(round(linspace(min(smooth_dur), max(smooth_dur), 5), 2));
-    % if plot_colorbar; colorbar; end
-    % axis xy
-    % 
-    % subplot(length(target_live_spans),column_num,plot_idx * column_num + 5)
-    % current_egain_map = exp_gain_maps{i};
-    % imagesc(current_egain_map)
-    % hold on
-    % contour(1:step_n, 1:step_n, current_egain_map, 'LineColor', 'k', 'LineWidth', 1);
-    % plot((distances(life_span_keys(i,:) == 1)-min(distances))./zoom_dist, ...
-    %     (durations(life_span_keys(i,:) == 1)-min(durations))./zoom_dur,'k.')
-    % hold off
-    % 
-    % if i == length(target_live_spans)
-    %     xlabel('Distance')
-    % elseif i == 1
-    %     title('Expected Gain')
-    % end
-    % 
-    % xticks(linspace(1, step_n, 5));
-    % xticklabels(round(linspace(min(smooth_dist), max(smooth_dist), 5), 0));
-    % yticks(linspace(1, step_n, 5));
-    % yticklabels(round(linspace(min(smooth_dur), max(smooth_dur), 5), 2));
-    % if plot_colorbar; colorbar; end
-    % axis xy
-
+    % Use patch for gradient lines. We add a NaN to the end of x and y 
+    % because patch colors the segments between vertices.
+    patch([x NaN], [y NaN], [p_of_hit NaN], 'EdgeColor', 'interp', ...
+          'LineWidth', 3, 'LineStyle', '--', 'DisplayName', sprintf('k = %d', k_vals(i)));
 end
-sgtitle(['Participant ' participant ' Ideal Observer'])
 
-% saveas(gcf, fullfile('fitts', ['Participant_' participant '_Ideal_Observer.png']));
+title('Variation in k');
+xlabel('Distance (mm)'); ylabel('Duration (s)');
+grid on;
+clim([0 1]); % Sets color scale from 0 to 1
+legend('Location', 'northeast'); % Automatically uses 'DisplayName'
+
+% --- Subplot 2: Varying target size ---
+subplot(1,2,2)
+k_fixed = 10;
+tar_sizes = 6:4:22; % Updated to match your original legend intent
+hold on
+
+for i = 1:length(tar_sizes)
+    y = log2(2 .* x ./ tar_sizes(i)) ./ k_fixed;
+    
+    p_of_hit = local_p_hit2d_rect(repmat(tar_sizes(i), size(x)), ...
+               fun_std(phi_hat(1:3), x, y), ...
+               fun_std(phi_hat(4:6), x, y), phi_hat(7));
+
+    patch([x NaN], [y NaN], [p_of_hit NaN], 'EdgeColor', 'interp', ...
+          'LineWidth', 3, 'LineStyle', '--', 'DisplayName', sprintf('Size = %g', tar_sizes(i)));
+end
+
+title('Variation in Target Size');
+xlabel('Distance (mm)'); ylabel('Duration (s)');
+grid on;
+clim([0 1]); 
+legend('Location', 'northeast'); % Automatically uses 'DisplayName'
+
+% --- Global Colorbar ---
+% This creates one colorbar that applies to the current axes (0 to 1)
+cb = colorbar; 
+cb.Label.String = 'Probability of Hit (p\_of\_hit)';
+% Move colorbar to the right of both plots
+cb.Layout.Tile = 'east'; % If using tiledlayout, otherwise default is fine
+

@@ -27,7 +27,7 @@
 %% Load Data
 clear all
 close all
-participant = 'JH';
+participant = 'LC';
 fname_preamble = sprintf('data_onlineConf/usable/%s_sptatialTemporalCostFunc*.mat',participant);
 files = dir(fname_preamble);
 for k = 1:numel(files)
@@ -522,7 +522,7 @@ end
 figure('Name', 'Per-Trial p(hit) and Optimal Duration');
 colors = lines(length(target_live_spans));  % Color palette for blocks
 
-subplot(1, 2, 1);
+subplot(1, 3, 1);
 hold on;
 for blk = 1:length(target_live_spans)
     idx_trials = life_span_keys(blk, :) == 1;
@@ -536,7 +536,8 @@ legend('Fast','Medium','Slow','Location', 'northeast');
 grid off;
 hold off;
 
-subplot(1, 2, 2);
+% Plot 2: Actual Duration vs Optimal Duration for Max Expected Gain (colored by lifespan block)
+subplot(1, 3, 2);
 hold on;
 for blk = 1:length(target_live_spans)
     idx_trials = life_span_keys(blk, :) == 1;
@@ -549,37 +550,30 @@ ylim([0,1])
 legend('Fast','Medium','Slow','Location', 'northeast');
 grid off;
 hold off;
-%%
-% Plot 2: Actual Duration vs Optimal Duration for Max Expected Gain (colored by lifespan block)
-subplot(1, 2, 2);
+
+subplot(1, 3, 3);
 hold on;
 for blk = 1:length(target_live_spans)
     idx_trials = life_span_keys(blk, :) == 1;
-    scatter(durations(idx_trials), optimal_durs(idx_trials), 50, colors(blk, :), 'filled', 'MarkerFaceAlpha', 0.7);
+    scatter(copy(idx_trials,27), p_hits(idx_trials), 50, colors(blk, :), 'filled', 'MarkerFaceAlpha', 0.7);
 end
-xlabel('Actual Duration (s)');
-ylabel('Optimal Duration (s)');
-xlim([0.1,0.9])
-xticks(0.1:0.1:0.9)
-ylim([0.1,0.9])
-% title('Actual vs Optimal Duration for Max Expected Gain');
-% Add reference line (y = x)
-plot(xlim,ylim,'--k')
-% refline('Color', [0.5 0.5 0.5], 'LineStyle', '--');
+xlabel('Condition');
+ylabel('Predicted P(hit)');
+% title('Predicted P(hit) vs Distance');
+xticks([120,360,600])
+xticklabels(["Fast" "Medium" "Slow"])
+ylim([0,1])
 legend('Fast','Medium','Slow','Location', 'northeast');
-
-
 grid off;
 hold off;
 
-
-% sgtitle(sprintf('Participant %s: Per-Trial Predictions', participant));
+sgtitle(sprintf('Participant %s: Per-Trial Predictions', participant));
 
 % Optional: Save the figure
 % saveas(gcf, fullfile('fitts_plots', sprintf('Participant_%s_PerTrial_Predictions.png', participant)));
 % close all
 
-
+%%
 function Sigma = local_cov_pred(stdF, phi, dist, dur)
 sig_gain = stdF(phi(1:2), dist, dur);      % σ_g in linear scale
 sig_dir = stdF(phi(3:4), dist, dur);      % σ_d in linear scale

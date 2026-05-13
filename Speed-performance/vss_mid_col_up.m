@@ -192,21 +192,22 @@ for i = 1:3
     mdl = fitlm(distances,avg_speed);
     x_fit = linspace(0, 380, 2);
     y_fit = mdl.Coefficients.Estimate(1) + mdl.Coefficients.Estimate(2) .* x_fit;
-    plot(x_fit, y_fit, 'k-', 'LineWidth', 1);
+    plt = plot(x_fit, y_fit, 'k-', 'LineWidth', 6);
+    % plt.Color(4) = 0.3;
 
 
 % 原始 condition line: speed = distance / lifespan
-    plot(x,y,'--','Color',[0 0.4 0.8],'LineWidth',2); % 蓝色
+    plot(x,y,'--','Color', "#00923a",'LineWidth',6); % 蓝色
 
 % 新增：半大小的 condition line（红色）
     y_half = x ./ (0.5 * unique(copy(block_ind==1,3)));
-    plot(x, y_half, '--r','LineWidth',2); % 红色虚线
+    plot(x, y_half, '--','Color', "#8fc31f",'LineWidth',6); % 红色虚线
 
     hold off
     xlabel("Target Distance (mm)");
     ylabel("Average Speed (mm/s)");
     % title(blockNames{i})
-    legend('Data','Linear Fit','Disappear deadline', 'Half-target time','Location','southeast')
+    % legend('Data','Linear Fit','Disappear deadline', 'Half-target time','Location','southeast')
     xlim([0,380]);
     xticks(0:100:300)
     ylim([0,600]);
@@ -238,8 +239,8 @@ for b = 1:nBlocks
         if isnan(a) || isnan(s), continue; end
 
         y_fit = a + s .* x_fit;
-        plot(x_fit, y_fit, '-k', 'LineWidth', 2, 'DisplayName', participants{ip});
-
+        plt = plot(x_fit, y_fit, '-k', 'LineWidth', 6, 'DisplayName', participants{ip});
+        % plt.Color(4) = 0.3;
         y_max_fit = max(y_max_fit, max(y_fit));
     end
 
@@ -247,11 +248,11 @@ for b = 1:nBlocks
     life = median(lifeBlockSubs(b, ~isnan(lifeBlockSubs(b,:))), 'omitnan');
     if ~isnan(life) && life > 0
         y_cond = x_fit ./ life;
-        plot(x_fit, y_cond, '--', 'Color', [0 0.4 0.8], 'LineWidth', 2, ...
+        plot(x_fit, y_cond, '--', 'Color', "#00923a", 'LineWidth', 6, ...
             'DisplayName', 'Min speed (match disappear deadline)');
 
         y_half = x_fit ./ (0.5*life);
-        plot(x_fit, y_half, '--r', 'LineWidth', 2, ...
+        plot(x_fit, y_half, '--','Color', "#8fc31f", 'LineWidth', 6, ...
             'DisplayName', 'Min speed (half-size target)');
     end
 
@@ -267,7 +268,7 @@ for b = 1:nBlocks
     xticks(0:100:300)
     ylim([0, 1000]);
 
-    grid on;
+    % grid on;
 end
 
 % sgtitle("12 subjects: regression lines (speed vs distance) overlaid per block");
@@ -276,107 +277,5 @@ end
 % legend('Location','northwest', 'NumColumns', 2);
 
 %%
-%% ====== Plot: 3 subplots, overlay regression lines ====== final version
-figure('Color','w');
-
-for i = 1:3
-    block_ind = zeros(size(copy,1),1);
-    block_ind((1+(i-1)*240):(i*240)) = 1;
-    
-    subplot(2,3,i)
-
-    distances = copy(block_ind==1,10);
-    avg_speed = copy(block_ind==1,22);
-    x = linspace(0,380,2);
-    y = x ./ unique(copy(block_ind==1,3));
-    
-    % plot(distances,avg_speed,'o');
-    scatter(distances, avg_speed, 25, colors(i,:), 'filled', "MarkerEdgeColor","none",'MarkerFaceAlpha', 0.7);
-    hold on
-
-    mdl = fitlm(distances,avg_speed);
-    x_fit = linspace(0, 380, 2);
-    y_fit = mdl.Coefficients.Estimate(1) + mdl.Coefficients.Estimate(2) .* x_fit;
-    plot(x_fit, y_fit, 'k-', 'LineWidth', 1);
-
-
-% 原始 condition line: speed = distance / lifespan
-    plot(x,y,'--','Color',[0 0.4 0.8],'LineWidth',2); % 蓝色
-
-% 新增：半大小的 condition line（红色）
-    y_half = x ./ (0.5 * unique(copy(block_ind==1,3)));
-    plot(x, y_half, '--r','LineWidth',2); % 红色虚线
-
-    hold off
-    % xlabel("Target Distance (mm)");
-    ylabel("Average Speed (mm/s)");
-    % title(blockNames{i})
-    legend('Data','Linear Fit','Disappear deadline', 'Half-target time','Location','southeast')
-    xlim([0,380]);
-    xticks(0:100:300)
-    xticklabels([])
-    ylim([0,600]);
-    yticks(0:200:600)
-
-
-    % hold off
-    % xlabel("Target Distance (mm)");
-    % ylabel("Average Speed (mm/s)");
-    % legend('Trial data','Minimum speed')
-    % xlim([0,lim_scale * max(copy(:,10))]);
-    % ylim([0,lim_scale * max(copy(:,22))]);
-end
-
-for b = 1:nBlocks
-    subplot(2,3,b+3); hold on;
-
-    x_max = lim_scale * maxDistBlock(b);
-    if x_max <= 0
-        title(sprintf('Block %d (no data)', b));
-        continue;
-    end
-    x_fit = linspace(0, 380, 2);
-
-    % --- subject regression lines ---
-    y_max_fit = 0;
-    for ip = 1:numel(participants)
-        a = fits_speed(b,1,ip);
-        s = fits_speed(b,2,ip);
-        if isnan(a) || isnan(s), continue; end
-
-        y_fit = a + s .* x_fit;
-        plot(x_fit, y_fit, '-k', 'LineWidth', 2, 'DisplayName', participants{ip});
-
-        y_max_fit = max(y_max_fit, max(y_fit));
-    end
-
-    % --- condition lines (use median lifespan across subjects for this block) ---
-    life = median(lifeBlockSubs(b, ~isnan(lifeBlockSubs(b,:))), 'omitnan');
-    if ~isnan(life) && life > 0
-        y_cond = x_fit ./ life;
-        plot(x_fit, y_cond, '--', 'Color', [0 0.4 0.8], 'LineWidth', 2, ...
-            'DisplayName', 'Min speed (match disappear deadline)');
-
-        y_half = x_fit ./ (0.5*life);
-        plot(x_fit, y_half, '--r', 'LineWidth', 2, ...
-            'DisplayName', 'Min speed (half-size target)');
-    end
-
-    xlabel("Target Distance (mm)");
-    ylabel("Average Speed (mm/s)");
-
-    % --- axes ---
-    y_max = max([maxSpdBlock(b)*lim_scale, y_max_fit, ...
-                 (exist('y_cond','var')*max(y_cond) + ~exist('y_cond','var')*0), ...
-                 (exist('y_half','var')*max(y_half) + ~exist('y_half','var')*0)]);
-    if y_max <= 0, y_max = 1; end
-    xlim([0, 380]);
-    xticks(0:100:300)
-    ylim([0, 1000]);
-
-
-    grid on;
-end
-
 
 

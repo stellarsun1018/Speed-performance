@@ -149,31 +149,21 @@ for ip = 1:part_n
 
     figure
 
-    subplot(2,2,1)
-    scatter(reach_distances,residuals,10,'filled')
+    subplot(1,2,1)
+    scatter(reach_distances,residuals,25, 'k', 'filled', "MarkerEdgeColor","none")
     xlabel('Reach distance'); ylabel('Residuals'); yline(0,'--')
+    xlim([75 325])
+    xticks(100:100:300)
+    ylim([-60 60])
+    yticks(-60:30:60)
 
-    subplot(2,2,2)
-    scatter(avg_speed,residuals,10,'filled')
+    subplot(1,2,2)
+    scatter(avg_speed,residuals, 25, 'k', 'filled', "MarkerEdgeColor","none")
     xlabel('Average speed'); ylabel('Residuals'); yline(0,'--')
+    xlim([225 675])
+xticks(300:100:600)
+    ylim([-60 60])
+    yticks(-60:30:60)
 
-    subplot(2,2,3)
-    edges = linspace(min(reach_distances), max(reach_distances), nbin_dist+1);
-    binID = discretize(reach_distances, edges);
-    binCenters = (edges(1:end-1) + edges(2:end)) / 2;
-    std_dist = accumarray(binID, residuals, [nbin_dist 1], @std, NaN);
-    plot(binCenters, std_dist, 'o-')
-    xlabel('Reach distance'); ylabel('S.D. of residuals')
-
-    subplot(2,2,4)
-    edges = linspace(min(avg_speed), max(avg_speed), nbin_speed+1);
-    binID = discretize(avg_speed, edges);
-    binCenters = (edges(1:end-1) + edges(2:end)) / 2;
-    std_speed = accumarray(binID, residuals, [nbin_speed 1], @std, NaN);
-    plot(binCenters, std_speed, 'o-')
-    xlabel('Average speed'); ylabel('S.D. of residuals')
-
-    % saveas(gcf,fullfile('results', 'plots', 'fig5',sprintf('dir_%s.png', part)));
-    % close all
 end
 
